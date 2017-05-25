@@ -88,7 +88,7 @@ fn main() {
     } else if target.contains("macos") {
         println!("cargo:rustc-link-lib=c++");
     } else {
-        println!("cargo:rustc-link-lib=stdc++");
+        println!("cargo:rustc-link-lib=c++");
     }
 
     println!("cargo:outdir={}", out_dir);
