@@ -32,6 +32,7 @@ pub mod error;
 pub mod glue;
 pub mod heap;
 pub mod jsval;
+pub mod magic;
 pub mod panic;
 pub mod typedarray;
 
