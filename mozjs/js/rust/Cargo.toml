@@ -19,6 +19,8 @@ name = "evaluate"
 [[test]]
 name = "magic_dom"
 [[test]]
+name = "magic_dom_impl"
+[[test]]
 name = "panic"
 [[test]]
 name = "rooting"
@@ -47,3 +49,4 @@ libc = "0.2"
 log = "0.3"
 heapsize = ">=0.2, <0.4"
 num-traits = "0.1.32"
+magic_codegen = { path = "magic_codegen" }

@@ -55,8 +55,8 @@ struct DOMPoint {
 }
 
 // TODO
-const DOMPoint_class: jsapi::js::Class = {
-};
+// const DOMPoint_class: jsapi::js::Class = {
+// };
 
 impl RootKind for DOMPoint {
     #[inline(always)]
@@ -85,37 +85,53 @@ impl GCMethods for DOMPoint {
 fn test_DOMPoint_magic_layout() {
     // Assert that a magic dom struct is physically just a pointer to a
     // jsapi::JSObject.
-    assert_eq!(mem::size_of::<DOMPoint>(), mem::size_of::<*mut jsapi::JSObject>());
-    assert_eq!(mem::align_of::<DOMPoint>(), mem::align_of::<*mut jsapi::JSObject>());
+    assert_eq!(mem::size_of::<DOMPoint>(),
+               mem::size_of::<*mut jsapi::JSObject>());
+    assert_eq!(mem::align_of::<DOMPoint>(),
+               mem::align_of::<*mut jsapi::JSObject>());
 
     // Assert that all the `MagicSlot` fields' `self` pointer is a pointer to
     // the `*mut jsapi::JSObject`.
     let instance: DOMPoint = unsafe { mem::zeroed() };
-    assert_eq!(&instance as *const _ as usize, &instance.object as *const _ as usize);
-    assert_eq!(&instance.x as *const _ as usize, &instance.object as *const _ as usize);
-    assert_eq!(&instance.y as *const _ as usize, &instance.object as *const _ as usize);
-    assert_eq!(&instance.z as *const _ as usize, &instance.object as *const _ as usize);
-    assert_eq!(&instance.w as *const _ as usize, &instance.object as *const _ as usize);
+    let uptr_size = mem::size_of::<usize>();
+    assert_eq!(&instance as *const _ as usize,
+               &instance.object as *const _ as usize);
+    assert_eq!(&instance.x as *const _ as usize - uptr_size,
+               &instance.object as *const _ as usize);
+    assert_eq!(&instance.y as *const _ as usize - uptr_size,
+               &instance.object as *const _ as usize);
+    assert_eq!(&instance.z as *const _ as usize - uptr_size,
+               &instance.object as *const _ as usize);
+    assert_eq!(&instance.w as *const _ as usize - uptr_size,
+               &instance.object as *const _ as usize);
 }
 
 enum DOMPointSlotIndex0 {}
 impl SlotIndex for DOMPointSlotIndex0 {
-    fn slot_index() -> u32 { 0 }
+    fn slot_index() -> u32 {
+        0
+    }
 }
 
 enum DOMPointSlotIndex1 {}
 impl SlotIndex for DOMPointSlotIndex1 {
-    fn slot_index() -> u32 { 1 }
+    fn slot_index() -> u32 {
+        1
+    }
 }
 
 enum DOMPointSlotIndex2 {}
 impl SlotIndex for DOMPointSlotIndex2 {
-    fn slot_index() -> u32 { 2 }
+    fn slot_index() -> u32 {
+        2
+    }
 }
 
 enum DOMPointSlotIndex3 {}
 impl SlotIndex for DOMPointSlotIndex3 {
-    fn slot_index() -> u32 { 3 }
+    fn slot_index() -> u32 {
+        3
+    }
 }
 
 #[test]

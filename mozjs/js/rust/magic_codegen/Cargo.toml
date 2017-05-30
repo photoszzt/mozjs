@@ -1,0 +1,11 @@
+[package]
+name = "magic_codegen"
+version = "0.1.0"
+authors = ["zzhu <zzhu@mozilla.com>"]
+
+[dependencies]
+syn = "0.11"
+quote = "0.3"
+
+[lib]
+proc-macro = true
