@@ -31,6 +31,20 @@ macro_rules! magic_dom {
     }
 }
 
+#[macro_export]
+macro_rules! get_js_val_number {
+    ($val:ident, $cx:ident, $call_args:ident, $arg_idx:expr) => {
+        let $val = match ToNumber($cx, $call_args.index($arg_idx)) {
+            Ok(num) => num,
+            Err(_) => {
+                JS_ReportErrorASCII($cx, format!("Can't recognize arg {}", $arg_idx)
+                                    .into_bytes().as_ptr() as *const libc::c_char);
+                return false;
+            },
+        };
+    }
+}
+
 /// TODO FITZGEN
 pub trait SlotIndex {
     fn slot_index() -> u32;
@@ -57,12 +71,12 @@ impl<T, I> MagicSlot<T, I>
           I: SlotIndex
 {
     unsafe fn get_object(&self) -> *mut jsapi::JSObject {
-        let obj_ptr_ptr: *const *mut jsapi::JSObject = mem::transmute(self);
-        debug_assert!(obj_ptr_ptr != ptr::null());
         /// subtract a word according to current struct memory layout
-        let obj_ptr = (*obj_ptr_ptr as usize -
-                       mem::size_of::<usize>()) as *mut jsapi::JSObject;
-        obj_ptr
+        debug_assert!(self as *const _ != ptr::null());
+        let obj_ptr_ptr = (self as *const _ as usize -
+                       mem::size_of::<usize>()) as *const *mut jsapi::JSObject;
+        debug_assert!(obj_ptr_ptr != ptr::null());
+        *obj_ptr_ptr
     }
 
     /// Get the value stored in this slot.
@@ -108,5 +122,10 @@ impl<T, I> MagicSlot<T, I>
     pub unsafe fn initialize(&self, cx: *mut jsapi::JSContext, t: T) {
         // TODO: same as `set` but assert that the slot is `undefined` and don't
         // read + drop the slot value.
+        rooted!(in(cx) let obj = self.get_object());
+
+        rooted!(in(cx) let mut val = jsval::UndefinedValue());
+        t.to_jsval(cx, val.handle_mut());
+        jsapi::JS_SetReservedSlot(obj.get(), I::slot_index(), &*val);
     }
 }

@@ -21,6 +21,7 @@ use std::sync::{Once, ONCE_INIT};
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
 use std::thread;
 use jsapi::root::*;
+use jsapi;
 use jsval::{self, UndefinedValue};
 use glue::{CreateAutoObjectVector, CreateCallArgsFromVp, AppendToAutoObjectVector, DeleteAutoObjectVector, IsDebugBuild};
 use glue::{CreateAutoIdVector, SliceAutoIdVector, DestroyAutoIdVector};
@@ -1101,5 +1102,108 @@ pub unsafe fn maybe_wrap_value(cx: *mut JSContext, rval: JS::MutableHandleValue)
         assert!(JS_WrapValue(cx, rval));
     } else if rval.is_object() {
         maybe_wrap_object_value(cx, rval);
+    }
+}
+
+impl JSPropertySpec {
+    pub fn getter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: func,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn setter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: func,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn getter_setter(name: *const ::std::os::raw::c_char,
+                               flags: u8,
+                               g_f: JSNative,
+                               s_f: JSNative)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: g_f,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: s_f,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn end_spec() -> JSPropertySpec {
+        JSPropertySpec {
+            name: ptr::null(),
+            flags: 0,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1{
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
     }
 }

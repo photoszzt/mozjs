@@ -300,6 +300,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_GC",
     "JS_GetArrayBufferData",
     "JS_GetArrayBufferViewType",
+    "JS_GetClass",
     "JS_GetFloat32ArrayData",
     "JS_GetFloat64ArrayData",
     "JS_GetFunctionObject",
@@ -316,6 +317,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_GetPrototype",
     "JS_GetReservedSlot",
     "JS::GetScriptedCallerGlobal",
+    "js::GetTestingFunctions",
     "JS_GetTwoByteStringCharsAndLength",
     "JS_GetUint16ArrayData",
     "JS_GetUint32ArrayData",
@@ -324,6 +326,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS::GetWellKnownSymbol",
     "JS_GlobalObjectTraceHook",
     "JS::HideScriptedCaller",
+    "JS_InitClass",
     "JS_InitStandardClasses",
     "JS_IsArrayObject",
     "JS_IsExceptionPending",
@@ -344,6 +347,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_NewInt32Array",
     "JS_NewInt8Array",
     "JS_NewObject",
+    "JS_NewObjectForConstructor",
     "JS_NewObjectWithGivenProto",
     "JS_NewObjectWithoutMetadata",
     "JS_NewObjectWithUniqueType",
@@ -421,6 +425,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "js::UnwrapUint32Array",
     "js::UnwrapUint8Array",
     "js::UnwrapUint8ClampedArray",
+    "JS_ValueToSource",
 ];
 
 /// Types that should be treated as an opaque blob of bytes whenever they show

@@ -1,9 +1,11 @@
 #![feature(proc_macro)]
-#![recursion_limit="128"]
+#![recursion_limit="256"]
 extern crate proc_macro;
 extern crate syn;
 #[macro_use]
 extern crate quote;
+#[macro_use]
+extern crate lazy_static;
 
 use syn::{Body, VariantData};
 use proc_macro::TokenStream;
@@ -35,18 +37,34 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         .split('_')
         .next()
         .expect("Should have a '_' in the magic dom struct name");
+    let name_field = quote::Ident::from(format!("b\"{}\\0\"", name));
+    let js_class = quote::Ident::from(format!("{}_CLASS", name.to_uppercase()));
     let name = quote::Ident::from(name);
-    let jsclass = quote::Ident::from(format!("{}_class", name));
     let struct_init_gc = get_init_struct_field(variant);
-    let (struct_def, slot_num) = get_struct_def(&name, variant);
+    let init_copy = struct_init_gc.to_vec();
+    let MagicStructCode {
+        struct_def,
+        slots,
+        getters,
+        setters,
+        js_getters,
+        js_setters,
+        js_prop_spec
+    } = get_magic_struct_code(&name, variant);
+    let spec_size = js_prop_spec.len() + 1;
     let struct_field_tests = get_addr_test_struct_field(variant);
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
+    let num_reserved_slots = quote::Ident::from(format!("{}", slots.len()));
 
-    /// TODO: Need to generate the js class implementation
     quote! {
+        extern crate libc;
         use js::jsapi;
+        use js::jsapi::root::*;
         use js::magic::{MagicSlot, SlotIndex};
         use js::rust::{GCMethods, RootKind};
+        use js::glue::CreateCallArgsFromVp;
+        use js::jsval::DoubleValue;
+        use js::rust::ToNumber;
 
         use std::mem;
         use std::ptr;
@@ -54,6 +72,15 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         pub struct #name {
             #(#struct_def,)*
         }
+
+        pub static #js_class : jsapi::JSClass = jsapi::JSClass {
+            name: #name_field as *const u8 as *const libc::c_char,
+            flags: (#num_reserved_slots &
+                    jsapi::JSCLASS_RESERVED_SLOTS_MASK) << jsapi::JSCLASS_RESERVED_SLOTS_SHIFT |
+            jsapi::JSCLASS_HAS_PRIVATE,
+            cOps: 0 as *const _,
+            reserved: [0 as *mut _; 3],
+        };
 
         impl RootKind for #name  {
             #[inline(always)]
@@ -66,12 +93,32 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
             fn as_jsobject(&self) -> *mut jsapi::JSObject {
                 self.object
             }
+
+            pub unsafe fn from_object(obj: *mut JSObject) -> Option<#name> {
+                if jsapi::JS_GetClass(obj) as *const _ as usize == &#js_class as *const _ as usize {
+                    Some(#name {
+                        object: obj,
+                        #(#struct_init_gc,)*
+                    })
+                } else {
+                    None
+                }
+            }
+
+            pub unsafe fn check_this(cx: *mut JSContext, args: &JS::CallArgs) -> Option<#name> {
+                rooted!(in(cx) let thisv = args.thisv().get());
+                if !thisv.is_object() {
+                    return None;
+                }
+                #name::from_object(thisv.to_object())
+            }
         }
 
         impl GCMethods for #name  {
             unsafe fn initial() -> #name {
                 #name {
-                    #(#struct_init_gc,)*
+                    object: ptr::null_mut(),
+                    #(#init_copy,)*
                 }
             }
 
@@ -83,7 +130,22 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
             }
         }
 
-        #(#slot_num)*
+        #(#getters)*
+
+        #(#setters)*
+
+        #(#js_getters)*
+
+        #(#js_setters)*
+
+        lazy_static! {
+            pub static ref PS_ARR: [JSPropertySpec; #spec_size] = [
+                #(#js_prop_spec,)*
+                JSPropertySpec::end_spec(),
+            ];
+        }
+
+        #(#slots)*
 
         #[test]
         fn it_compiles() {
@@ -103,22 +165,19 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
     }
 }
 
-/// This function generates the code to initialize the struct. 
+/// This function generates the code to initialize the struct.
 fn get_init_struct_field(variant: &syn::VariantData) -> Vec<quote::Tokens> {
     let res = match *variant {
         VariantData::Struct(ref fields) => {
-            let mut items: Vec<_> = fields
+            let items: Vec<_> = fields
                 .iter()
                 .map(|f| {
                     let ident = &f.ident;
                     quote! {
-                        #ident: MagicSlot::new() 
+                        #ident: MagicSlot::new()
                     }
                 })
                 .collect();
-            items.push(quote!{
-                object: ptr::null_mut()
-            });
             items
         }
         _ => panic!("Only struct is implemented"),
@@ -147,34 +206,251 @@ fn get_addr_test_struct_field(variant: &syn::VariantData) -> Vec<quote::Tokens> 
     res
 }
 
-/// This function generates a tuple which consists the definition of the struct and the 
-/// definition of the slot number.
-fn get_struct_def(name: &quote::Ident, variant: &syn::VariantData) -> (Vec<quote::Tokens>, Vec<quote::Tokens>) {
+/// This hashmap stores the mapping of the symbol of a Rust type to the symbol of a function
+/// that converts the Rust type into the corresponding JS type.
+lazy_static! {
+    static ref JSVAL: std::collections::HashMap<syn::Ident, syn::Ident> = {
+        let mut m = std::collections::HashMap::new();
+        m.insert(syn::Ident::from("f64"), syn::Ident::from("DoubleValue"));
+        m.insert(syn::Ident::from("u32"), syn::Ident::from("UInt32Value"));
+        m.insert(syn::Ident::from("i32"), syn::Ident::from("Int32Value"));
+        m.insert(syn::Ident::from("JSString"), syn::Ident::from("StringValue"));
+        m.insert(syn::Ident::from("bool"), syn::Ident::from("BooleanValue"));
+        m.insert(syn::Ident::from("JSObject"), syn::Ident::from("ObjectValue"));
+        m
+    };
+}
+
+struct MagicStructCode {
+    /// A definition of the magic struct itself.
+    struct_def: Vec<quote::Tokens>,
+
+    /// The definition of the number of slots the magic struct requires.
+    slots: Vec<quote::Tokens>,
+
+    /// Rust getters for the data stored in slots.
+    getters: Vec<quote::Tokens>,
+
+    /// Rust setters for the data stored in slots.
+    setters: Vec<quote::Tokens>,
+
+    /// `JSNative` getter functions exposed to JavaScript.
+    js_getters: Vec<quote::Tokens>,
+
+    /// `JSNative` setter functions exposed to JavaScript.
+    js_setters: Vec<quote::Tokens>,
+
+    /// The `JSPropertySpec` definition that exposes the `JSNative`s to JavaScript.
+    js_prop_spec: Vec<quote::Tokens>,
+}
+
+fn gen_structdef_and_slotnum(id: &Option<syn::Ident>,
+                             name: &quote::Ident,
+                             ty: &syn::Ty,
+                             idx: usize) -> (quote::Tokens, quote::Tokens) {
+    let slot_type_name = quote::Ident::from(format!("{}SlotIndex{}", name, idx));
+    let slot = quote! {
+        enum #slot_type_name {}
+        impl SlotIndex for #slot_type_name {
+            fn slot_index() -> u32 { #idx as u32 }
+        }
+    };
+    let field = quote! {
+        #id: MagicSlot<#ty, #slot_type_name>
+    };
+    (field, slot)
+}
+
+fn gen_getter(id: &Option<syn::Ident>,
+              name: &quote::Ident,
+              ty: &syn::Ty) -> (quote::Tokens, quote::Ident) {
+    let getter_str = match *id {
+        Some(ref real_id) => format!("get_{}", real_id.to_string()),
+        None => panic!("Encounter a empty field. Something wrong..."),
+    };
+    let getter_name = quote::Ident::from(getter_str);
+    let getter = quote! {
+        pub unsafe fn #getter_name (obj: &#name, cx: *mut jsapi::JSContext) -> #ty {
+            (*obj).#id.get(cx)
+        }
+    };
+    (getter, getter_name)
+}
+
+fn gen_setter(id: &Option<syn::Ident>,
+              name: &quote::Ident,
+              ty: &syn::Ty) -> (quote::Tokens, quote::Ident) {
+    let setter_str = match *id {
+        Some(ref real_id) => format!("set_{}", real_id.to_string()),
+        None => panic!("Encounter a empty field. Something wrong..."),
+    };
+    let setter_name = quote::Ident::from(setter_str);
+    let setter = quote! {
+        pub fn #setter_name (obj: &#name, cx: *mut jsapi::JSContext, t: #ty) {
+            unsafe {
+                (*obj).#id.set(cx, t);
+            }
+        }
+    };
+    (setter, setter_name)
+}
+
+fn gen_js_getter(id: &Option<syn::Ident>,
+                 name: &quote::Ident,
+                 ty: &syn::Ty,
+                 getter_name: &quote::Ident) -> (quote::Tokens, quote::Ident) {
+    let js_getter_str = match *id {
+        Some(ref real_id) => format!("js_get_{}", real_id.to_string()),
+        None => panic!("Encounter a empty field. Something wrong..."),
+    };
+    let js_getter_name = quote::Ident::from(js_getter_str);
+    let jsval = match *ty {
+        syn::Ty::Path(ref qself, ref path) => {
+            if let &Some(ref q) = qself {
+                panic!("Check the qself: {:?}", q);
+            }
+            let seg = &path.segments[0];
+            match JSVAL.get(&seg.ident) {
+                Some(jsval_func) => jsval_func,
+                None => {
+                    panic!("No corresponding js val function for {}", seg.ident);
+                }
+            }
+        },
+        _ => {
+            panic!("This type {:?} hasn't been handled", ty);
+        }
+    };
+    let js_getter = quote! {
+        pub extern "C" fn #js_getter_name (cx: *mut jsapi::JSContext, argc: u32, vp: *mut JS::Value)
+                                           -> bool {
+            let res = unsafe {
+                let call_args = CreateCallArgsFromVp(argc, vp);
+                if call_args._base.argc_ != 0 {
+                    JS_ReportErrorASCII(cx, b"getter doesn't require any arguments\0".as_ptr()
+                                        as *const libc::c_char);
+                    return false;
+                }
+                let obj = match #name::check_this(cx, &call_args) {
+                    Some(obj_) => obj_,
+                    None => {
+                        JS_ReportErrorASCII(cx, b"Can't convert JSObject\0".as_ptr()
+                                            as *const libc::c_char);
+                        return false;
+                    },
+                };
+                let val = #getter_name(&obj, cx);
+                call_args.rval().set(#jsval(val));
+                true
+            };
+            res
+        }
+    };
+    (js_getter, js_getter_name)
+}
+
+fn gen_js_setter(id: &Option<syn::Ident>,
+                 name: &quote::Ident,
+                 setter_name: &quote::Ident) -> (quote::Tokens, quote::Ident) {
+    let js_setter_str = match *id {
+        Some(ref real_id) => format!("js_set_{}", real_id.to_string()),
+        None => panic!("Encounter a empty field. Something wrong..."),
+    };
+    let js_setter_name = quote::Ident::from(js_setter_str);
+    let js_setter = quote! {
+        pub extern "C" fn #js_setter_name (cx: *mut jsapi::JSContext, argc: u32, vp: *mut JS::Value)
+                                           -> bool {
+            let res = unsafe {
+                let call_args = CreateCallArgsFromVp(argc, vp);
+                if call_args._base.argc_ != 1 {
+                    JS_ReportErrorASCII(cx, b"setter requires exactly 1 arguments\0".as_ptr()
+                                        as *const libc::c_char);
+                    return false;
+                }
+                let obj = match #name::check_this(cx, &call_args) {
+                    Some(obj_) => obj_,
+                    None => {
+                        JS_ReportErrorASCII(cx, b"Can't convert JSObject\0".as_ptr()
+                                            as *const libc::c_char);
+                        return false;
+                    },
+                };
+                let v = match ToNumber(cx, call_args.index(0)) {
+                    Ok(num) => num,
+                    Err(_) => {
+                        JS_ReportErrorASCII(cx, b"Can't recognize arg 0\0".as_ptr() as *const libc::c_char);
+                        return false;
+                    },
+                };
+                #setter_name(&obj, cx, v);
+                true
+            };
+            res
+        }
+    };
+    (js_setter, js_setter_name)
+}
+
+fn gen_js_prop_spec(id: &Option<syn::Ident>,
+                    js_getter_name: &quote::Ident,
+                    js_setter_name: &quote::Ident) -> quote::Tokens {
+    let js_prop_spec_str = match *id {
+        Some(ref real_id) => format!("b\"{}\\0\" as *const u8 as *const libc::c_char", real_id.to_string()),
+        None => panic!("Encounter a empty field. Something wrong..."),
+    };
+    let js_prop_spec_name = quote::Ident::from(js_prop_spec_str);
+    quote! {
+        JSPropertySpec::getter_setter(#js_prop_spec_name,
+                                      jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT,
+                                      Some(#js_getter_name), Some(#js_setter_name))
+    }
+}
+
+/// This function generates a struct which consists the definition of the struct, the
+/// definition of the slot number, Rust getters and setters for the data stored in slots,
+/// `JSNative` getter and setters and JSPropertySpec array elements.
+fn get_magic_struct_code(name: &quote::Ident,
+                         variant: &syn::VariantData)
+                         -> MagicStructCode {
     let res = match *variant {
         VariantData::Struct(ref fields) => {
-            let mut result = Vec::new();
-            let mut slot_num_res = Vec::new();
-            result.push(quote! {
+            let mut structdef = Vec::new();
+            let mut slots = Vec::new();
+            let mut getters = Vec::new();
+            let mut setters = Vec::new();
+            let mut js_getters = Vec::new();
+            let mut js_setters = Vec::new();
+            let mut js_prop_specs = Vec::new();
+            structdef.push(quote! {
                 object: *mut jsapi::JSObject
             });
             for (idx, field) in fields.iter().enumerate() {
                 let id = &field.ident;
                 let ty = &field.ty;
-                let slot_num_type_name = quote::Ident::from(format!("{}SlotIndex{}", name, idx));
-                let slot_num = quote! {
-                    enum #slot_num_type_name {}
-                    impl SlotIndex for #slot_num_type_name {
-                        fn slot_index() -> u32 { #idx as u32 }
-                    }
-                };
-                let new = quote! {
-                    #id: MagicSlot<#ty, #slot_num_type_name>
-                };
-                slot_num_res.push(slot_num);
-                result.push(new);
+                let (field, slot_num) = gen_structdef_and_slotnum(id, name, ty, idx);
+                let (getter, getter_name) = gen_getter(id, name, ty);
+                let (setter, setter_name) = gen_setter(id, name, ty);
+                let (js_getter, js_getter_name) = gen_js_getter(id, name, ty, &getter_name);
+                let (js_setter, js_setter_name) = gen_js_setter(id, name, &setter_name);
+                let js_prop_spec = gen_js_prop_spec(id, &js_getter_name, &js_setter_name);
+                structdef.push(field);
+                slots.push(slot_num);
+                getters.push(getter);
+                setters.push(setter);
+                js_setters.push(js_setter);
+                js_getters.push(js_getter);
+                js_prop_specs.push(js_prop_spec);
             }
-            (result, slot_num_res)
-        }
+            MagicStructCode {
+                struct_def: structdef,
+                slots: slots,
+                getters: getters,
+                setters: setters,
+                js_getters: js_getters,
+                js_setters: js_setters,
+                js_prop_spec: js_prop_specs,
+            }
+        },
         _ => panic!("Only struct is implemented"),
     };
     res
