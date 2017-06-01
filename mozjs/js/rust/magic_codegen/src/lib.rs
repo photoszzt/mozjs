@@ -1,5 +1,5 @@
 #![feature(proc_macro)]
-#![recursion_limit="128"]
+#![recursion_limit="256"]
 extern crate proc_macro;
 extern crate syn;
 #[macro_use]
@@ -25,6 +25,7 @@ pub fn magic_dom(input: TokenStream) -> TokenStream {
         Body::Enum(_) => panic!("#[derive(magic-dom)] can only be used with structs"),
         Body::Struct(ref data) => match_struct(&ast, data),
     };
+    println!("{}", gen.to_string());
     gen.to_string().parse().unwrap()
 }
 
@@ -35,16 +36,27 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         .split('_')
         .next()
         .expect("Should have a '_' in the magic dom struct name");
+    let dom_flag = if name.starts_with("DOM") {
+        quote::Ident::from("jsapi::JSCLASS_IS_DOMJSCLASS")
+    } else {
+        quote::Ident::from("")
+    };
+    let name_field = quote::Ident::from(format!("b\"{}\\0\"", name));
     let name = quote::Ident::from(name);
-    let jsclass = quote::Ident::from(format!("{}_class", name));
+    let js_class = quote::Ident::from(format!("{}_class", name));
     let struct_init_gc = get_init_struct_field(variant);
-    let (struct_def, slot_num) = get_struct_def(&name, variant);
+    let init_copy = struct_init_gc.to_vec();
+    let (struct_def, slot_num, getters, setters) =
+        get_struct_def(&name, variant);
     let struct_field_tests = get_addr_test_struct_field(variant);
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
+    let num_reserved_slots = quote::Ident::from(format!("{}", slot_num.len()));
 
     /// TODO: Need to generate the js class implementation
     quote! {
+        extern crate libc;
         use js::jsapi;
+        use js::jsapi::root::*;
         use js::magic::{MagicSlot, SlotIndex};
         use js::rust::{GCMethods, RootKind};
 
@@ -54,6 +66,16 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         pub struct #name {
             #(#struct_def,)*
         }
+
+        pub static #js_class : jsapi::JSClass = jsapi::JSClass {
+            name: #name_field as *const u8 as *const libc::c_char,
+            flags: (#num_reserved_slots &
+                    jsapi::JSCLASS_RESERVED_SLOTS_MASK) << jsapi::JSCLASS_RESERVED_SLOTS_SHIFT |
+            jsapi::JSCLASS_HAS_PRIVATE  |
+            #dom_flag,
+            cOps: 0 as *const _,
+            reserved: [0 as *mut _; 3],
+        };
 
         impl RootKind for #name  {
             #[inline(always)]
@@ -66,12 +88,24 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
             fn as_jsobject(&self) -> *mut jsapi::JSObject {
                 self.object
             }
+
+            fn from_object(obj: *mut JSObject) -> Option<#name> {
+                if jsapi::JS_GetClass(obj) as usize == &#js_class as usize {
+                    Some(#name {
+                        object: obj,
+                        #(#struct_init_gc,)*
+                    })
+                } else {
+                    None
+                }
+            }
         }
 
         impl GCMethods for #name  {
             unsafe fn initial() -> #name {
                 #name {
-                    #(#struct_init_gc,)*
+                    object: ptr::null_mut(),
+                    #(#init_copy,)*
                 }
             }
 
@@ -83,7 +117,23 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
             }
         }
 
+        #(#getters)*
+
+        #(#setters)*
+
         #(#slot_num)*
+
+        pub fn check_this(cx: *mut JSContext, args: &JS::CallArgs) -> Option<*mut JSObject> {
+            rooted!(in(cx) let thisv = args.thisv());
+            if !thisv.is_object() {
+                return None;
+            }
+            let jsobj = thisv.to_object();
+            if jsapi::JS_GetClass(jsobj) as usize != &#js_class as usize {
+                return None;
+            }
+            Some(jsobj)
+        }
 
         #[test]
         fn it_compiles() {
@@ -103,22 +153,19 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
     }
 }
 
-/// This function generates the code to initialize the struct. 
+/// This function generates the code to initialize the struct.
 fn get_init_struct_field(variant: &syn::VariantData) -> Vec<quote::Tokens> {
     let res = match *variant {
         VariantData::Struct(ref fields) => {
-            let mut items: Vec<_> = fields
+            let items: Vec<_> = fields
                 .iter()
                 .map(|f| {
                     let ident = &f.ident;
                     quote! {
-                        #ident: MagicSlot::new() 
+                        #ident: MagicSlot::new()
                     }
                 })
                 .collect();
-            items.push(quote!{
-                object: ptr::null_mut()
-            });
             items
         }
         _ => panic!("Only struct is implemented"),
@@ -147,13 +194,19 @@ fn get_addr_test_struct_field(variant: &syn::VariantData) -> Vec<quote::Tokens> 
     res
 }
 
-/// This function generates a tuple which consists the definition of the struct and the 
-/// definition of the slot number.
-fn get_struct_def(name: &quote::Ident, variant: &syn::VariantData) -> (Vec<quote::Tokens>, Vec<quote::Tokens>) {
+/// This function generates a tuple which consists the definition of the struct, the
+/// definition of the slot number, getter and setter for the object and getters and
+/// setters for the js
+fn get_struct_def(name: &quote::Ident,
+                  variant: &syn::VariantData)
+                  -> (Vec<quote::Tokens>, Vec<quote::Tokens>, Vec<quote::Tokens>,
+                      Vec<quote::Tokens>) {
     let res = match *variant {
         VariantData::Struct(ref fields) => {
             let mut result = Vec::new();
             let mut slot_num_res = Vec::new();
+            let mut getters = Vec::new();
+            let mut setters = Vec::new();
             result.push(quote! {
                 object: *mut jsapi::JSObject
             });
@@ -167,14 +220,42 @@ fn get_struct_def(name: &quote::Ident, variant: &syn::VariantData) -> (Vec<quote
                         fn slot_index() -> u32 { #idx as u32 }
                     }
                 };
+                let getter_str = match *id {
+                    Some(ref real_id) => format!("get_{}", real_id.to_string()),
+                    None => panic!("Encounter a empty field. Something wrong..."),
+                };
+                let setter_str = match *id {
+                    Some(ref real_id) => format!("set_{}", real_id.to_string()),
+                    None => panic!("Encounter a empty field. Something wrong..."),
+                };
+                let getter_name = quote::Ident::from(getter_str);
+                let setter_name = quote::Ident::from(setter_str);
                 let new = quote! {
                     #id: MagicSlot<#ty, #slot_num_type_name>
                 };
+
+                // getter and setter for the obj #name
+                let getter = quote! {
+                    pub fn #getter_name (obj: #name, cx: *mut jsapi::JSContext) -> #ty {
+                        unsafe {
+                            obj.#id.get(cx)
+                        }
+                    }
+                };
+                let setter = quote! {
+                    pub fn #setter_name (obj: #name, cx: *mut jsapi::JSContext, t: #ty) {
+                        unsafe {
+                            obj.#id.set(cx, t);
+                        }
+                    }
+                };
                 slot_num_res.push(slot_num);
                 result.push(new);
+                getters.push(getter);
+                setters.push(setter);
             }
-            (result, slot_num_res)
-        }
+            (result, slot_num_res, getters, setters)
+        },
         _ => panic!("Only struct is implemented"),
     };
     res

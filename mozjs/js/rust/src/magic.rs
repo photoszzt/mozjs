@@ -31,6 +31,96 @@ macro_rules! magic_dom {
     }
 }
 
+#[macro_export]
+macro_rules! get_js_val_number {
+    ($val:ident, $cx:ident, $call_args:ident, $arg_idx:expr) => {
+        let $val = match ToNumber($cx, $call_args.index($arg_idx)) {
+            Ok(num) => num,
+            Err(_) => {
+                let error_str = CString::new(format!("Can't recognize arg {}", $arg_idx).into_bytes());
+                JS_ReportErrorASCII($cx, error_str.as_ptr() as *const libc::c_char);
+                return false;
+            },
+        };
+    }
+}
+
+#[macro_export]
+macro_rules! js_getter {
+    ($name:ident, $js_getter_name:ident, $getter_name:ident, $js_value_method:ident) => {
+        pub extern "C" fn $js_getter_name (cx: *mut jsapi::JSContext, argc: u32, vp: *const JS::Value)
+                                           -> bool {
+            let call_args = CreateCallArgsFromVp(argc, vp);
+            if call_args._base.argc_ != 0 {
+                JS_ReportErrorASCII(cx, b"getter doesn't require any arguments\0".as_ptr()
+                                    as *const libc::c_char);
+                return false;
+            }
+            let obj = match check_this(cx, call_args) {
+                Some(jsobj) => {
+                    match $name :: from_object(jsobj) {
+                        Some(obj_) => obj_,
+                        None => {
+                            JS_ReportErrorASCII(cx, b"Can't convert JSObject\0".as_ptr()
+                                                as *const libc::c_char);
+                            return false;
+                        },
+                    }
+                },
+                None => {
+                    JS_ReportErrorASCII(cx, b"Can't find JS Object\0".as_ptr()
+                                        as *const libc::c_char);
+                    return false;
+                }
+            };
+            let val = $getter_name(obj, cx);
+            call_args.rval.set($js_value_method(val));
+            true
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! js_setter {
+    ($name:ident, $js_setter_name:ident, $setter_name:ident) => {
+        pub extern "C" fn $js_setter_name (cx: *mut jsapi::JSContext, argc: u32, vp: *const JS::Value)
+                                           -> bool {
+            let call_args = CreateCallArgsFromVp(argc, vp);
+            if call_args._base.argc_ != 1 {
+                JS_ReportErrorASCII(cx, b"setter requires exactly 1 arguments\0".as_ptr()
+                                    as *const libc::c_char);
+                return false;
+            }
+            let obj = match check_this(cx, call_args) {
+                Some(jsobj) => {
+                    match $name :: from_object(jsobj) {
+                        Some(obj_) => obj_,
+                        None => {
+                            JS_ReportErrorASCII(cx, b"Can't convert JSObject\0".as_ptr()
+                                                as *const libc::c_char);
+                            return false;
+                        },
+                    }
+                },
+                None => {
+                    JS_ReportErrorASCII(cx, b"Can't find JS Object\0".as_ptr()
+                                        as *const libc::c_char);
+                    return false;
+                }
+            };
+            let v = match ToNumber(cx, call_args.index(0)) {
+                Ok(num) => num,
+                Err(_) => {
+                    JS_ReportErrorASCII(cx, b"Can't recognize arg 0\0".as_ptr() as *const libc::c_char);
+                    return false;
+                },
+            };
+            #setter_name(obj, cx, v);
+            true
+        }
+    }
+}
+
 /// TODO FITZGEN
 pub trait SlotIndex {
     fn slot_index() -> u32;
@@ -108,5 +198,10 @@ impl<T, I> MagicSlot<T, I>
     pub unsafe fn initialize(&self, cx: *mut jsapi::JSContext, t: T) {
         // TODO: same as `set` but assert that the slot is `undefined` and don't
         // read + drop the slot value.
+        rooted!(in(cx) let obj = self.get_object());
+
+        rooted!(in(cx) let mut val = jsval::UndefinedValue());
+        t.to_jsval(cx, val.handle_mut());
+        jsapi::JS_SetReservedSlot(obj.get(), I::slot_index(), &*val);
     }
 }
