@@ -21,6 +21,7 @@ use std::sync::{Once, ONCE_INIT};
 use std::sync::atomic::{AtomicBool, AtomicPtr, AtomicUsize, Ordering};
 use std::thread;
 use jsapi::root::*;
+use jsapi;
 use jsval::{self, UndefinedValue};
 use glue::{CreateAutoObjectVector, CreateCallArgsFromVp, AppendToAutoObjectVector, DeleteAutoObjectVector, IsDebugBuild};
 use glue::{CreateAutoIdVector, SliceAutoIdVector, DestroyAutoIdVector};
@@ -210,6 +211,13 @@ impl Runtime {
     /// Returns the underlying `JSContext` object.
     pub fn cx(&self) -> *mut JSContext {
         self.cx
+    }
+
+    /// Returns the underlying `JSContext`'s `JSRuntime`.
+    pub fn rt(&self) -> *mut JSRuntime {
+        unsafe {
+            JS_GetRuntime(self.cx)
+        }
     }
 
     pub fn evaluate_script(&self, glob: JS::HandleObject, script: &str, filename: &str,
@@ -990,16 +998,12 @@ pub unsafe fn define_methods(cx: *mut JSContext, obj: JS::HandleObject,
 pub unsafe fn define_properties(cx: *mut JSContext, obj: JS::HandleObject,
                                 properties: &'static [JSPropertySpec])
                                 -> Result<(), ()> {
+    assert!(!properties.is_empty());
     assert!({
-        match properties.last() {
-            Some(ref spec) => {
-                slice::from_raw_parts(spec as *const _ as *const u8,
-                                      mem::size_of_val(spec))
-                    .iter()
-                    .all(|byte| *byte == 0)
-            },
-            None => false,
-        }
+        let spec = properties.last().unwrap();
+        let slice = slice::from_raw_parts(spec as *const _ as *const u8,
+                                          mem::size_of::<JSPropertySpec>());
+        slice.iter().all(|byte| *byte == 0)
     });
 
     JS_DefineProperties(cx, obj, properties.as_ptr()).to_result()
@@ -1098,5 +1102,108 @@ pub unsafe fn maybe_wrap_value(cx: *mut JSContext, rval: JS::MutableHandleValue)
         assert!(JS_WrapValue(cx, rval));
     } else if rval.is_object() {
         maybe_wrap_object_value(cx, rval);
+    }
+}
+
+impl JSPropertySpec {
+    pub fn getter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: func,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn setter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: func,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn getter_setter(name: *const ::std::os::raw::c_char,
+                               flags: u8,
+                               g_f: JSNative,
+                               s_f: JSNative)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: g_f,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: s_f,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn end_spec() -> JSPropertySpec {
+        JSPropertySpec {
+            name: ptr::null(),
+            flags: 0,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1{
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        native: JSNativeWrapper {
+                            op: None,
+                            info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
     }
 }

@@ -71,6 +71,10 @@ fn build_jsapi_bindings() {
     builder = builder.clang_arg("-I");
     builder = builder.clang_arg(include_dir);
 
+    for ty in UNSAFE_IMPL_SYNC_TYPES {
+        builder = builder.raw_line(format!("unsafe impl Sync for {} {{}}", ty));
+    }
+
     for extra in EXTRA_CLANG_FLAGS {
         builder = builder.clang_arg(*extra);
     }
@@ -105,6 +109,15 @@ fn build_jsapi_bindings() {
     println!("cargo:rerun-if-changed=src/jsapi.rs");
 }
 
+/// JSAPI types for which we should implement `Sync`.
+const UNSAFE_IMPL_SYNC_TYPES: &'static [&'static str] = &[
+    "JSClass",
+    "JSFunctionSpec",
+    "JSNativeWrapper",
+    "JSPropertySpec",
+    "JSTypedMethodJitInfo",
+];
+
 /// Flags passed through bindgen directly to Clang.
 const EXTRA_CLANG_FLAGS: &'static [&'static str] = &[
     "-x", "c++",
@@ -134,6 +147,7 @@ const WHITELIST_TYPES: &'static [&'static str] = &[
     "JS::HandleValueArray",
     "JS::IsAcceptableThis",
     "JSAutoCompartment",
+    "JSAutoStructuredCloneBuffer",
     "JSClass",
     "JSClassOps",
     "JSContext",
@@ -276,6 +290,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS::detail::InitWithFailureDiagnostic",
     "JS_DestroyContext",
     "JS::DisableIncrementalGC",
+    "js::Dump.*",
     "JS_EncodeStringToUTF8",
     "JS_EndRequest",
     "JS_EnterCompartment",
@@ -285,9 +300,11 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_GC",
     "JS_GetArrayBufferData",
     "JS_GetArrayBufferViewType",
+    "JS_GetClass",
     "JS_GetFloat32ArrayData",
     "JS_GetFloat64ArrayData",
     "JS_GetFunctionObject",
+    "JS_GetGCParameter",
     "JS_GetInt16ArrayData",
     "JS_GetInt32ArrayData",
     "JS_GetInt8ArrayData",
@@ -300,6 +317,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_GetPrototype",
     "JS_GetReservedSlot",
     "JS::GetScriptedCallerGlobal",
+    "js::GetTestingFunctions",
     "JS_GetTwoByteStringCharsAndLength",
     "JS_GetUint16ArrayData",
     "JS_GetUint32ArrayData",
@@ -308,6 +326,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS::GetWellKnownSymbol",
     "JS_GlobalObjectTraceHook",
     "JS::HideScriptedCaller",
+    "JS_InitClass",
     "JS_InitStandardClasses",
     "JS_IsArrayObject",
     "JS_IsExceptionPending",
@@ -328,6 +347,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_NewInt32Array",
     "JS_NewInt8Array",
     "JS_NewObject",
+    "JS_NewObjectForConstructor",
     "JS_NewObjectWithGivenProto",
     "JS_NewObjectWithoutMetadata",
     "JS_NewObjectWithUniqueType",
@@ -357,6 +377,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "JS_SetGCCallback",
     "JS::SetGCSliceCallback",
     "JS_SetGCParameter",
+    "JS_SetGCZeal",
     "JS_SetGlobalJitCompilerOption",
     "JS_SetImmutablePrototype",
     "JS_SetNativeStackQuota",
@@ -404,6 +425,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "js::UnwrapUint32Array",
     "js::UnwrapUint8Array",
     "js::UnwrapUint8ClampedArray",
+    "JS_ValueToSource",
 ];
 
 /// Types that should be treated as an opaque blob of bytes whenever they show
