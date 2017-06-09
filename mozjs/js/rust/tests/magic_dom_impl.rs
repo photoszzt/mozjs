@@ -35,11 +35,7 @@ magic_dom! {
     }
 }
 
-use magic_dom_spec::set_x as set_x;
-use magic_dom_spec::set_y as set_y;
-use magic_dom_spec::set_z as set_z;
-use magic_dom_spec::set_w as set_w;
-
+#[allow(non_snake_case)]
 unsafe extern "C" fn DOMPoint_constructor(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
     let call_args = CreateCallArgsFromVp(argc, vp);
     if call_args._base.argc_ != 4 {
@@ -65,10 +61,10 @@ unsafe extern "C" fn DOMPoint_constructor(cx: *mut JSContext, argc: u32, vp: *mu
             return false;
         }
     };
-    set_x(&d, cx, x);
-    set_y(&d, cx, y);
-    set_z(&d, cx, z);
-    set_w(&d, cx, w);
+    d.set_x(cx, x);
+    d.set_y(cx, y);
+    d.set_z(cx, z);
+    d.set_w(cx, w);
     call_args.rval().set(ObjectValue(jsobj.get()));
     true
 }
@@ -89,7 +85,7 @@ fn get_and_set() {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
-        rooted!(in(cx) let dom_point_proto =
+        rooted!(in(cx) let _dom_point_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(),
                              &magic_dom_spec::DOMPOINT_CLASS, Some(DOMPoint_constructor),
                              4, magic_dom_spec::PS_ARR.as_ptr(), std::ptr::null(),
