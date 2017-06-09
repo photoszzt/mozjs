@@ -20,11 +20,15 @@ extern crate lazy_static;
 extern crate libc;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate magic_codegen;
 extern crate mozjs_sys;
 extern crate num_traits;
 
 #[macro_use]
 pub mod rust;
+#[macro_use]
+pub mod magic;
 
 pub mod ac;
 pub mod conversions;
@@ -32,13 +36,14 @@ pub mod error;
 pub mod glue;
 pub mod heap;
 pub mod jsval;
-pub mod magic;
 pub mod panic;
 pub mod sc;
 pub mod typedarray;
 
 pub mod jsapi;
 use self::jsapi::root::*;
+
+pub mod magicdom;
 
 #[inline(always)]
 pub unsafe fn JS_ARGV(_cx: *mut JSContext, vp: *mut JS::Value) -> *mut JS::Value {
