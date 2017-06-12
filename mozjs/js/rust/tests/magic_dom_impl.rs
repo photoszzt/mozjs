@@ -3,71 +3,25 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #[macro_use]
-extern crate magic_codegen;
-#[macro_use]
 extern crate js;
 extern crate libc;
-#[macro_use]
-extern crate lazy_static;
 
-use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS, ToNumber};
+use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
 use js::rust;
-use js::glue::CreateCallArgsFromVp;
 use js::jsapi;
 use js::jsapi::root::JS;
 use js::jsapi::root::{JS_ReportErrorASCII, JS_NewGlobalObject,
                       JS_InitClass, JSContext, JS_EncodeStringToUTF8, JS_DefineFunction,};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
-use js::jsval::{ObjectValue, StringValue, UndefinedValue};
+use js::jsval::{StringValue, UndefinedValue};
+use js::magicdom::DOMPOINT_CLASS;
+use js::magicdom::DOMPOINT_PS_ARR;
+use js::magicdom::DOMPoint_constructor;
 
 use std::ffi::CStr;
 use std::ptr;
 use std::str;
-
-magic_dom! {
-    DOMPoint,
-    struct DOMPoint_spec {
-        x: f64,
-        y: f64,
-        z: f64,
-        w: f64,
-    }
-}
-
-#[allow(non_snake_case)]
-unsafe extern "C" fn DOMPoint_constructor(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-    let call_args = CreateCallArgsFromVp(argc, vp);
-    if call_args._base.argc_ != 4 {
-        JS_ReportErrorASCII(cx, b"constructor requires exactly 4 arguments\0".as_ptr() as *const libc::c_char);
-        return false;
-    }
-    get_js_val_number!(x, cx, call_args, 0);
-    get_js_val_number!(y, cx, call_args, 1);
-    get_js_val_number!(z, cx, call_args, 2);
-    get_js_val_number!(w, cx, call_args, 3);
-    rooted!(in(cx) let jsobj = jsapi::JS_NewObjectForConstructor(cx,
-                                                                 &magic_dom_spec::DOMPOINT_CLASS as *const _,
-                                                                 &call_args as *const _));
-    if jsobj.is_null() {
-        JS_ReportErrorASCII(cx, b"Fail to construct JS object\0".as_ptr() as *const libc::c_char);
-        return false;
-    }
-    let d = match DOMPoint::from_object(jsobj.get()) {
-        Some(o) => o,
-        None => {
-            JS_ReportErrorASCII(cx, b"Fail to construct DOMPoint from JS object\0".as_ptr()
-                                as *const libc::c_char);
-            return false;
-        }
-    };
-    d.set_x(cx, x);
-    d.set_y(cx, y);
-    d.set_z(cx, z);
-    d.set_w(cx, w);
-    call_args.rval().set(ObjectValue(jsobj.get()));
-    true
-}
 
 #[test]
 fn get_and_set() {
@@ -87,8 +41,8 @@ fn get_and_set() {
 
         rooted!(in(cx) let _dom_point_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(),
-                             &magic_dom_spec::DOMPOINT_CLASS, Some(DOMPoint_constructor),
-                             4, magic_dom_spec::PS_ARR.as_ptr(), std::ptr::null(),
+                             &DOMPOINT_CLASS, Some(DOMPoint_constructor),
+                             4, DOMPOINT_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -145,7 +99,7 @@ if (dp.w != 5000) {
 
 // val_to_str: debug function
 // Can turn a JSValue to JSString
-unsafe extern "C" fn val_to_str(context: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
+pub unsafe extern "C" fn val_to_str(context: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
     let args = JS::CallArgs::from_vp(vp, argc);
 
     if args._base.argc_ != 1 {
@@ -160,7 +114,7 @@ unsafe extern "C" fn val_to_str(context: *mut JSContext, argc: u32, vp: *mut JS:
 }
 
 // print a JSString to terminal
-unsafe extern "C" fn puts(context: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
+pub unsafe extern "C" fn puts(context: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
     let args = JS::CallArgs::from_vp(vp, argc);
 
     if args._base.argc_ != 1 {

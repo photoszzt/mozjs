@@ -19,6 +19,8 @@ name = "evaluate"
 [[test]]
 name = "magic_dom_impl"
 [[test]]
+name = "dom_quad"
+[[test]]
 name = "panic"
 [[test]]
 name = "rooting"
