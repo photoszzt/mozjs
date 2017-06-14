@@ -13,12 +13,12 @@ use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
 use js::jsval::UndefinedValue;
-use js::magicdom::DOMQUAD_CLASS;
-use js::magicdom::DOMQUAD_PS_ARR;
-use js::magicdom::DOMQuad_constructor;
-use js::magicdom::DOMPOINT_CLASS;
-use js::magicdom::DOMPOINT_PS_ARR;
-use js::magicdom::DOMPoint_constructor;
+use js::magicdom::domquad::DOMQUAD_CLASS;
+use js::magicdom::domquad::DOMQUAD_PS_ARR;
+use js::magicdom::domquad::DOMQuad_constructor;
+use js::magicdom::dompoint::DOMPOINT_CLASS;
+use js::magicdom::dompoint::DOMPOINT_PS_ARR;
+use js::magicdom::dompoint::DOMPoint_constructor;
 
 use std::ptr;
 use std::str;
@@ -63,10 +63,10 @@ let p3 = new DOMPoint(9,10,11,12);
 let p4 = new DOMPoint(13,14,15,16);
 let qd = new DOMQuad(p1,p2,p3,p4);
 if (Object.getPrototypeOf(qd) != DOMQuad.prototype) {
-    throw Error("dp prototype is wrong");
+    throw Error("qd prototype is wrong");
 }
 if (!(qd instanceof DOMQuad)) {
-    throw Error("is not instance of DOMPoint?");
+    throw Error("is not instance of DOMQuad?");
 }
 let p11 = qd.p1;
 if (p11.x != 1) {
@@ -120,21 +120,7 @@ if (p44.z != 15) {
 if (p44.w != 16) {
     throw Error("p4.w is not 16");
 }
-qd.p1 = new DOMPoint(17, 18, 19, 20);
-let p12 = qd.p1;
-if (p12.x != 17) {
-    throw Error("p1.x is not 17");
-}
-if (p12.y != 18) {
-    throw Error("p1.y is not 18");
-}
-if (p12.z != 19) {
-    throw Error("p1.z is not 19");
-}
-if (p12.w != 20) {
-    throw Error("p1.w is not 20");
-}
 "#,
-                                   "test", 24, rval.handle_mut()).is_ok());
+                                   "test", 64, rval.handle_mut()).is_ok());
     }
 }

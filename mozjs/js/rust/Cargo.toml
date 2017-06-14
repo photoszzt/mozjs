@@ -11,13 +11,17 @@ cmake = "0.1"
 glob = "0.2.11"
 
 [[test]]
+name = "attr"
+[[test]]
 name = "callback"
+[[test]]
+name = "element"
 [[test]]
 name = "enumerate"
 [[test]]
 name = "evaluate"
 [[test]]
-name = "magic_dom_impl"
+name = "dom_point"
 [[test]]
 name = "dom_quad"
 [[test]]

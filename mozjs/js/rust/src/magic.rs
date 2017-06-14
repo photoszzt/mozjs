@@ -30,7 +30,6 @@
 macro_rules! magic_dom {
     (   $name:ident,
         $class_name:ident,
-        $ps_arr_name:ident,
         $constructor_name:ident,
         $mod_name:ident,
         struct $spec_name:ident {
@@ -51,7 +50,6 @@ macro_rules! magic_dom {
         }
         pub use self::$mod_name::$name as $name;
         pub use self::$mod_name::$class_name as $class_name;
-        pub use self::$mod_name::$ps_arr_name as $ps_arr_name;
         pub use self::$mod_name::$constructor_name as $constructor_name;
     }
 }
@@ -78,5 +76,63 @@ macro_rules! get_js_arg {
                 return false;
             },
         };
+    }
+}
+
+#[macro_export]
+macro_rules! js_getter {
+    ($js_getter_name:ident, $getter_name:ident, $name:ident) => {
+        pub extern "C" fn $js_getter_name (cx: *mut JSContext, argc: u32, vp: *mut JS::Value)
+                                           -> bool {
+            let res = unsafe {
+                let call_args = CreateCallArgsFromVp(argc, vp);
+                if call_args._base.argc_ != 0 {
+                    JS_ReportErrorASCII(cx, b"getter doesn't require any arguments\0".as_ptr()
+                                        as *const libc::c_char);
+                    return false;
+                }
+                let obj = match $name::check_this(cx, &call_args) {
+                    Some(obj_) => obj_,
+                    None => {
+                        JS_ReportErrorASCII(cx, b"Can't convert JSObject\0".as_ptr()
+                                            as *const libc::c_char);
+                        return false;
+                    },
+                };
+                let val = obj.$getter_name(cx);
+                val.to_jsval(cx, call_args.rval());
+                true
+            };
+            res
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! js_setter {
+    ($js_setter_name:ident, $setter_name:ident, $name:ident) => {
+        pub extern "C" fn $js_setter_name (cx: *mut JSContext, argc: u32, vp: *mut JS::Value)
+                                           -> bool {
+            let res = unsafe {
+                let call_args = CreateCallArgsFromVp(argc, vp);
+                if call_args._base.argc_ != 1 {
+                    JS_ReportErrorASCII(cx, b"setter requires exactly 1 arguments\0".as_ptr()
+                                        as *const libc::c_char);
+                    return false;
+                }
+                let obj = match $name::check_this(cx, &call_args) {
+                    Some(obj_) => obj_,
+                    None => {
+                        JS_ReportErrorASCII(cx, b"Can't convert JSObject\0".as_ptr()
+                                            as *const libc::c_char);
+                        return false;
+                    },
+                };
+                get_js_arg!(v, cx, call_args, 0);
+                obj.$setter_name(cx, v);
+                true
+            };
+            res
+        }
     }
 }

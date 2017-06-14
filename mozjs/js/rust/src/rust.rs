@@ -1131,31 +1131,6 @@ impl JSPropertySpec {
         }
     }
 
-    pub fn setter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
-                        -> JSPropertySpec {
-        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
-        JSPropertySpec {
-            name: name,
-            flags: flags | JSPROP_SHARED,
-            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
-                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
-                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-                        native: JSNativeWrapper {
-                            op: None,
-                            info: ptr::null(),
-                        },
-                    },
-                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
-                        native: JSNativeWrapper {
-                            op: func,
-                            info: ptr::null(),
-                        },
-                    }
-                }
-            }
-        }
-    }
-
     pub fn getter_setter(name: *const ::std::os::raw::c_char,
                                flags: u8,
                                g_f: JSNative,

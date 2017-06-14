@@ -15,9 +15,9 @@ use js::jsapi::root::{JS_ReportErrorASCII, JS_NewGlobalObject,
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
 use js::jsval::{StringValue, UndefinedValue};
-use js::magicdom::DOMPOINT_CLASS;
-use js::magicdom::DOMPOINT_PS_ARR;
-use js::magicdom::DOMPoint_constructor;
+use js::magicdom::dompoint::DOMPOINT_CLASS;
+use js::magicdom::dompoint::DOMPOINT_PS_ARR;
+use js::magicdom::dompoint::DOMPoint_constructor;
 
 use std::ffi::CStr;
 use std::ptr;
