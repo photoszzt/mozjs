@@ -56,8 +56,8 @@ macro_rules! magic_dom {
 
 #[macro_export]
 macro_rules! get_js_arg {
-    ($val:ident, $cx:ident, $call_args:ident, $arg_idx:expr) => {
-        let $val = match FromJSValConvertible::from_jsval($cx, $call_args.index($arg_idx), ()) {
+    ($val:ident, $cx:ident, $call_args:ident, $arg_idx:expr, $conversion_behavior:expr) => {
+        let $val = match FromJSValConvertible::from_jsval($cx, $call_args.index($arg_idx), $conversion_behavior) {
             Ok(num) => {
                 match num {
                     ConversionResult::Success(v) => v,
@@ -110,7 +110,7 @@ macro_rules! js_getter {
 
 #[macro_export]
 macro_rules! js_setter {
-    ($js_setter_name:ident, $setter_name:ident, $name:ident) => {
+    ($js_setter_name:ident, $setter_name:ident, $name:ident, $conversion_behavior:expr) => {
         pub extern "C" fn $js_setter_name (cx: *mut JSContext, argc: u32, vp: *mut JS::Value)
                                            -> bool {
             let res = unsafe {
@@ -128,7 +128,7 @@ macro_rules! js_setter {
                         return false;
                     },
                 };
-                get_js_arg!(v, cx, call_args, 0);
+                get_js_arg!(v, cx, call_args, 0, $conversion_behavior);
                 obj.$setter_name(cx, v);
                 true
             };

@@ -26,10 +26,10 @@ js_getter!(js_get_y, get_y, DOMPoint);
 js_getter!(js_get_z, get_z, DOMPoint);
 js_getter!(js_get_w, get_w, DOMPoint);
 
-js_setter!(js_set_x, set_x, DOMPoint);
-js_setter!(js_set_y, set_y, DOMPoint);
-js_setter!(js_set_z, set_z, DOMPoint);
-js_setter!(js_set_w, set_w, DOMPoint);
+js_setter!(js_set_x, set_x, DOMPoint, ());
+js_setter!(js_set_y, set_y, DOMPoint, ());
+js_setter!(js_set_z, set_z, DOMPoint, ());
+js_setter!(js_set_w, set_w, DOMPoint, ());
 
 lazy_static! {
     pub static ref DOMPOINT_PS_ARR: [JSPropertySpec; 5] = [

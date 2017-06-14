@@ -25,6 +25,8 @@ name = "dom_point"
 [[test]]
 name = "dom_quad"
 [[test]]
+name = "htmlelement"
+[[test]]
 name = "panic"
 [[test]]
 name = "rooting"
