@@ -6,3 +6,4 @@ pub mod attr;
 pub mod dompoint;
 pub mod domquad;
 pub mod element;
+pub mod htmlelement;

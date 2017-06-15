@@ -4,9 +4,12 @@ extern crate proc_macro;
 extern crate syn;
 #[macro_use]
 extern crate quote;
+#[macro_use]
+extern crate lazy_static;
 
 use syn::{Body, VariantData};
 use proc_macro::TokenStream;
+use std::collections::HashSet;
 
 /// The `#[derive(MagicDom)]` implementation.
 ///
@@ -48,7 +51,7 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         setters,
         get_callargs,
         setter_invocations,
-    } = get_magic_struct_code(&name, variant);
+    } = get_magic_struct_code(variant);
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
     let num_reserved_slots = quote::Ident::from(format!("{}", getters.len()));
     let arg_num_err = quote::Ident::from(format!("b\"constructor requires exactly {} \
@@ -64,7 +67,7 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         use glue::CreateCallArgsFromVp;
         use jsval::{DoubleValue, ObjectOrNullValue, ObjectValue};
         use rust::ToNumber;
-        use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
+        use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible, ToJSValConvertible};
         use jsval;
 
         use std::mem;
@@ -221,8 +224,24 @@ struct MagicStructCode {
     setter_invocations: Vec<quote::Tokens>,
 }
 
+lazy_static! {
+    static ref INTTYPESET: HashSet<syn::Ident> = {
+        let mut m = HashSet::new();
+        m.insert(syn::Ident::from("i8"));
+        m.insert(syn::Ident::from("u8"));
+        m.insert(syn::Ident::from("i16"));
+        m.insert(syn::Ident::from("u16"));
+        m.insert(syn::Ident::from("i32"));
+        m.insert(syn::Ident::from("u32"));
+        m.insert(syn::Ident::from("i64"));
+        m.insert(syn::Ident::from("u64"));
+        m
+    };
+}
+
 fn gen_getter(id: &Option<syn::Ident>,
               ty: &syn::Ty,
+              conversion_behavior: &quote::Ident,
               idx: u32) -> quote::Tokens {
     let getter_str = match *id {
         Some(ref real_id) => format!("get_{}", real_id.to_string()),
@@ -234,7 +253,7 @@ fn gen_getter(id: &Option<syn::Ident>,
             let jsobj = self.object;
             rooted!(in(cx) let val = JS_GetReservedSlot(jsobj, #idx));
 
-            let conversion = FromJSValConvertible::from_jsval(cx, val.handle(), ())
+            let conversion = FromJSValConvertible::from_jsval(cx, val.handle(), #conversion_behavior)
                 .expect("Should never put anything into a MagicSlot that we can't \
                          convert back out again");
 
@@ -272,10 +291,8 @@ fn gen_setter(id: &Option<syn::Ident>,
 }
 
 /// This function generates a struct which consists the definition of the struct, the
-/// definition of the slot number, Rust getters and setters for the data stored in slots,
-/// `JSNative` getter and setters and JSPropertySpec array elements.
-fn get_magic_struct_code(name: &quote::Ident,
-                         variant: &syn::VariantData)
+/// definition of the slot number and Rust getters and setters for the data stored in slots
+fn get_magic_struct_code(variant: &syn::VariantData)
                          -> MagicStructCode {
     let res = match *variant {
         VariantData::Struct(ref fields) => {
@@ -291,10 +308,26 @@ fn get_magic_struct_code(name: &quote::Ident,
                     None => panic!("Encounter an empty field. Something wrong..."),
                 };
                 let field_name = quote::Ident::from(field_name_str);
-                let getter = gen_getter(id, ty, idx as u32);
+                let conversion_behavior = match *ty {
+                    syn::Ty::Path(ref qself, ref path) => {
+                        if let &Some(ref q) = qself {
+                            panic!("Check the qself: {:?}", q);
+                        }
+                        let seg = &path.segments[0];
+                        if INTTYPESET.contains(&seg.ident) {
+                            quote::Ident::from("ConversionBehavior::Default")
+                        } else {
+                            quote::Ident::from("()")
+                        }
+                    },
+                    _ => {
+                        panic!("This type {:?} hasn't been handled", ty);
+                    }
+                };
+                let getter = gen_getter(id, ty, &conversion_behavior, idx as u32);
                 let (setter, setter_name) = gen_setter(id, ty, idx as u32);
                 let get_callarg = quote! {
-                    get_js_arg!(#field_name, cx, call_args, #idx as u32);
+                    get_js_arg!(#field_name, cx, call_args, #idx as u32, #conversion_behavior);
                 };
                 let setter_invocation = quote! {
                     #setter_name(cx, #field_name)
