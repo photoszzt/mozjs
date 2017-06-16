@@ -5,6 +5,7 @@
 use jsapi::root::*;
 use conversions::ToJSValConvertible;
 use glue::CreateCallArgsFromVp;
+
 extern crate libc;
 
 magic_dom! {

@@ -3,8 +3,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible, ToJSValConvertible};
+use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
+                  ToJSValConvertible};
 use glue::CreateCallArgsFromVp;
+
 extern crate libc;
 
 magic_dom! {

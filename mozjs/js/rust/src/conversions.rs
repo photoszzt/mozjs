@@ -84,6 +84,19 @@ impl_as!(u32, u32);
 impl_as!(i64, i64);
 impl_as!(u64, u64);
 
+
+#[cfg(target_pointer_width = "64")]
+impl_as!(u64, usize);
+
+#[cfg(target_pointer_width = "64")]
+impl_as!(usize, f64);
+
+#[cfg(target_pointer_width = "64")]
+impl_as!(f64, usize);
+
+#[cfg(target_pointer_width = "32")]
+impl_as!(usize, u32);
+
 /// A trait to convert Rust types to `JSVal`s.
 pub trait ToJSValConvertible {
     /// Convert `self` to a `JSVal`. JSAPI failure causes a panic.
@@ -423,6 +436,44 @@ impl FromJSValConvertible for u64 {
     }
 }
 
+#[cfg(target_pointer_width = "64")]
+impl ToJSValConvertible for usize {
+    #[inline]
+    unsafe fn to_jsval(&self, _cx: *mut JSContext, rval: JS::MutableHandleValue) {
+        rval.set(RUST_JS_NumberValue(*self as f64));
+    }
+}
+
+#[cfg(target_pointer_width = "32")]
+impl ToJSValConvertible for usize {
+    #[inline]
+    unsafe fn to_jsval(&self, _cx: *mut JSContext, rval: JS::MutableHandleValue) {
+        rval.set(UInt32Value(*self as u32));
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+impl FromJSValConvertible for usize {
+    type Config = ConversionBehavior;
+    unsafe fn from_jsval(cx: *mut JSContext,
+                         val: JS::HandleValue,
+                         option: ConversionBehavior)
+                         -> Result<ConversionResult<usize>, ()> {
+        convert_int_from_jsval(cx, val, option, ToUint64)
+    }
+}
+
+#[cfg(target_pointer_width = "32")]
+impl FromJSValConvertible for usize {
+    type Config = ConversionBehavior;
+    unsafe fn from_jsval(cx: *mut JSContext,
+                         val: JS::HandleValue,
+                         option: ConversionBehavior)
+                         -> Result<ConversionResult<usize>, ()> {
+        convert_int_from_jsval(cx, val, option, ToUint32)
+    }
+}
+
 // https://heycam.github.io/webidl/#es-float
 impl ToJSValConvertible for f32 {
     #[inline]
@@ -668,3 +719,4 @@ impl ToJSValConvertible for Heap<*mut JSObject> {
         maybe_wrap_object_or_null_value(cx, rval);
     }
 }
+

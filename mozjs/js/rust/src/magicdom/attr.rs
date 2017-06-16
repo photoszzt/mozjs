@@ -5,6 +5,7 @@
 use jsapi::root::*;
 use conversions::ToJSValConvertible;
 use glue::CreateCallArgsFromVp;
+
 extern crate libc;
 
 // A simple proto type that's different from what servo has
