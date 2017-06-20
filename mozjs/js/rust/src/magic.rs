@@ -50,7 +50,6 @@ macro_rules! magic_dom {
         }
         pub use self::$mod_name::$name as $name;
         pub use self::$mod_name::$class_name as $class_name;
-        pub use self::$mod_name::$constructor_name as $constructor_name;
     }
 }
 
@@ -133,6 +132,26 @@ macro_rules! js_setter {
                 true
             };
             res
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! gen_getter_inherit {
+    ($getter_name:ident, $ty:ty, $upcast:ident) => {
+        pub unsafe fn $getter_name(self: &Self, cx: *mut JSContext) -> <$ty as ToFromJsSlots>::Target {
+            let parent = self.$upcast();
+            parent.$getter_name(cx)
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! gen_setter_inherit {
+    ($setter_name:ident, $ty:ty, $upcast:ident) => {
+        pub fn $setter_name(self: &Self, cx: *mut JSContext, t: $ty) {
+            let parent = self.$upcast();
+            parent.$setter_name(cx, t);
         }
     }
 }

@@ -28,6 +28,8 @@ magic_dom! {
     }
 }
 
+pub use self::magic_dom_spec_Element::Element_constructor as Element_constructor;
+
 js_getter!(js_get_local_name, get_local_name, Element);
 js_getter!(js_get_tag_name, get_tag_name, Element);
 js_getter!(js_get_namespace, get_namespace, Element);

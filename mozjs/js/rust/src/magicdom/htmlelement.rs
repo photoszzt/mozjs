@@ -29,6 +29,8 @@ magic_dom! {
     }
 }
 
+pub use self::magic_dom_spec_HtmlElement::HtmlElement_constructor as HtmlElement_constructor;
+
 js_getter!(js_get_title, get_title, HtmlElement);
 js_getter!(js_get_lang, get_lang, HtmlElement);
 js_getter!(js_get_translate, get_translate, HtmlElement);

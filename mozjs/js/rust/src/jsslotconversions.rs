@@ -132,6 +132,20 @@ impl NumSlots for i64 {}
 impl NumSlots for f32 {}
 impl NumSlots for f64 {}
 
+impl InheritanceSlots for bool {}
+impl InheritanceSlots for str {}
+impl InheritanceSlots for String {}
+impl InheritanceSlots for u8 {}
+impl InheritanceSlots for i8 {}
+impl InheritanceSlots for u16 {}
+impl InheritanceSlots for i16 {}
+impl InheritanceSlots for u32 {}
+impl InheritanceSlots for i32 {}
+impl InheritanceSlots for u64 {}
+impl InheritanceSlots for i64 {}
+impl InheritanceSlots for f32 {}
+impl InheritanceSlots for f64 {}
+
 impl<T> NumSlots for Vec<T> {
     const NUM_SLOTS: u32 = 3;
 }
