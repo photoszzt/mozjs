@@ -59,7 +59,7 @@ fn get_and_set() {
         assert!(rt.evaluate_script(global.handle(), r#"
 let attr1 = new Attr("la", "a", "l", "pp", "foo");
 let attr2 = new Attr("lb", "b", "l", "pp", "bar");
-let element = new Element("la", "a", "l", "pp", [attr1, attr2]);
+let element = new Element("la", "a", "l", "pp", "foo", [attr1, attr2]);
 if (Object.getPrototypeOf(element) != Element.prototype) {
     throw Error("element prototype is wrong");
 }
@@ -77,6 +77,9 @@ if (element.namespace != "l") {
 }
 if (element.prefix != "pp") {
     throw Error("element.prefix is not l");
+}
+if (element.id != "foo") {
+    throw Error("element.id is not foo");
 }
 let attrss = element.attrs;
 if (attrss[0].local_name != "la") {
@@ -109,7 +112,11 @@ if (attrss[1].prefix != "pp") {
 if (attrss[1].value != "bar") {
     throw Error("attrss[1].value is not boo");
 }
+element.id = "bar";
+if (element.id != "bar") {
+    throw Error("element.id is not bar");
+}
 "#,
-                                   "test", 53, rval.handle_mut()).is_ok());
+                                   "test", 60, rval.handle_mut()).is_ok());
     }
 }

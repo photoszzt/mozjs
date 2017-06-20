@@ -5,6 +5,8 @@
 #![crate_name = "js"]
 #![crate_type = "rlib"]
 
+#![feature(associated_consts)]
+#![feature(associated_type_defaults)]
 #![feature(link_args)]
 #![feature(nonzero)]
 #![feature(const_fn)]
@@ -43,6 +45,8 @@ pub mod typedarray;
 pub mod jsapi;
 use self::jsapi::root::*;
 
+#[macro_use]
+pub mod jsslotconversions;
 pub mod magicdom;
 
 #[inline(always)]

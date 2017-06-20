@@ -10,6 +10,7 @@ extern crate lazy_static;
 use syn::{Body, VariantData};
 use proc_macro::TokenStream;
 use std::collections::HashSet;
+use quote::ToTokens;
 
 /// The `#[derive(MagicDom)]` implementation.
 ///
@@ -49,11 +50,14 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
     let MagicStructCode {
         getters,
         setters,
+        slot_counters,
         get_callargs,
         setter_invocations,
     } = get_magic_struct_code(variant);
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
-    let num_reserved_slots = quote::Ident::from(format!("{}", getters.len()));
+    let num_reserved_slots = quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS",
+                                                        name));
+    let num_fields = quote::Ident::from(format!("{}", getters.len()));
     let arg_num_err = quote::Ident::from(format!("b\"constructor requires exactly {} \
                                                   arguments\\0\".as_ptr() as *const \
                                                   libc::c_char", getters.len()));
@@ -67,7 +71,9 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         use glue::CreateCallArgsFromVp;
         use jsval::{DoubleValue, ObjectOrNullValue, ObjectValue};
         use rust::ToNumber;
-        use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible, ToJSValConvertible};
+        use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
+                          ToJSValConvertible};
+        use jsslotconversions::{InheritanceSlots, NumSlots, ToFromJsSlots};
         use jsval;
 
         use std::mem;
@@ -87,15 +93,45 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
             reserved: [0 as *mut _; 3],
         };
 
+        impl InheritanceSlots for #name {
+            const INHERITANCE_SLOTS: u32 = #(#slot_counters)* 0;
+        }
+
+        impl NumSlots for #name {
+            const NUM_SLOTS: u32 = 1;
+        }
+
+        impl ToFromJsSlots for #name {
+            type Target = Option<Self>;
+            const NEEDS_FINALIZE: bool = false;
+            const NEEDS_TRACE: bool = false;
+
+            unsafe fn from_slots(object: *mut JSObject, cx: *mut JSContext, offset: u32) -> Self::Target {
+                get_slot_val!(val1, obj, 0, cx, object, offset, ());
+                obj
+            }
+
+            unsafe fn into_slots(self, object: *mut JSObject, cx: *mut JSContext, offset: u32) {
+                let jsobj = self.as_jsobject();
+                set_slot_val!(prev_val, jsobj, 0, cx, object, offset);
+            }
+
+            fn finalize(_fop: *mut js::FreeOp, _obj: *mut JSObject, _offset: u32) {
+            }
+
+            fn trace(_trc: *mut JSTracer, _obj: *mut JSObject, _offset: u32) {
+            }
+        }
+
         impl RootKind for #name  {
             #[inline(always)]
-            fn rootKind() -> JS::RootKind  {
+            fn rootKind() -> JS::RootKind {
                 JS::RootKind::Object
             }
         }
 
         impl #name {
-            fn as_jsobject(&self) -> *mut JSObject {
+            pub fn as_jsobject(&self) -> *mut JSObject {
                 self.object
             }
 
@@ -165,7 +201,7 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         #[allow(non_snake_case)]
         pub unsafe extern "C" fn #constructor(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
             let call_args = CreateCallArgsFromVp(argc, vp);
-            if call_args._base.argc_ != #num_reserved_slots {
+            if call_args._base.argc_ != #num_fields {
                 JS_ReportErrorASCII(cx, #arg_num_err);
                 return false;
             }
@@ -217,6 +253,9 @@ struct MagicStructCode {
     /// Rust setters for the data stored in slots.
     setters: Vec<quote::Tokens>,
 
+    /// Arithmetic statements for calculating the total number of slots for 
+    slot_counters: Vec<quote::Ident>,
+
     /// Code to turn JS Value back to Rust value. Uses get_js_arg! macro
     get_callargs: Vec<quote::Tokens>,
 
@@ -241,7 +280,6 @@ lazy_static! {
 
 fn gen_getter(id: &Option<syn::Ident>,
               ty: &syn::Ty,
-              conversion_behavior: &quote::Ident,
               idx: u32) -> quote::Tokens {
     let getter_str = match *id {
         Some(ref real_id) => format!("get_{}", real_id.to_string()),
@@ -249,22 +287,9 @@ fn gen_getter(id: &Option<syn::Ident>,
     };
     let getter_name = quote::Ident::from(getter_str);
     quote! {
-        pub unsafe fn #getter_name (&self, cx: *mut JSContext) -> #ty {
+        pub unsafe fn #getter_name (&self, cx: *mut JSContext) -> <#ty as ToFromJsSlots>::Target {
             let jsobj = self.object;
-            rooted!(in(cx) let val = JS_GetReservedSlot(jsobj, #idx));
-
-            let conversion = FromJSValConvertible::from_jsval(cx, val.handle(), #conversion_behavior)
-                .expect("Should never put anything into a MagicSlot that we can't \
-                         convert back out again");
-
-            match conversion {
-                ConversionResult::Success(v) => v,
-                ConversionResult::Failure(why) => {
-                    panic!("Should never put anything into a MagicSlot that we \
-                            can't convert back out again: {}",
-                           why);
-                }
-            }
+            <#ty as ToFromJsSlots>::from_slots(jsobj, cx, #idx)
         }
     }
 }
@@ -281,9 +306,7 @@ fn gen_setter(id: &Option<syn::Ident>,
         pub fn #setter_name (&self, cx: *mut JSContext, t: #ty) {
             unsafe {
                 let jsobj = self.object;
-                rooted!(in(cx) let mut val = jsval::UndefinedValue());
-                t.to_jsval(cx, val.handle_mut());
-                JS_SetReservedSlot(jsobj, #idx, &*val);
+                t.into_slots(jsobj, cx, #idx);
             }
         }
     };
@@ -300,6 +323,8 @@ fn get_magic_struct_code(variant: &syn::VariantData)
             let mut setters = Vec::new();
             let mut get_callargs = Vec::new();
             let mut setter_invocations = Vec::new();
+            let mut slot_counters = Vec::new();
+            let mut offset = 0;
             for (idx, field) in fields.iter().enumerate() {
                 let id = &field.ident;
                 let ty = &field.ty;
@@ -307,6 +332,7 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                     Some(ref real_id) => format!("{}", real_id.to_string()),
                     None => panic!("Encounter an empty field. Something wrong..."),
                 };
+                let effective_idx = idx + offset;
                 let field_name = quote::Ident::from(field_name_str);
                 let conversion_behavior = match *ty {
                     syn::Ty::Path(ref qself, ref path) => {
@@ -324,22 +350,38 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                         panic!("This type {:?} hasn't been handled", ty);
                     }
                 };
-                let getter = gen_getter(id, ty, &conversion_behavior, idx as u32);
-                let (setter, setter_name) = gen_setter(id, ty, idx as u32);
+                let slot_counter = match *ty {
+                    syn::Ty::Path(ref qself, ref path) => {
+                        if let &Some(ref q) = qself {
+                            panic!("Check the qself: {:?}", q);
+                        }
+                        let mut t = quote::Tokens::new();
+                        path.to_tokens(&mut t);
+                        quote::Ident::from(format!("<{} as NumSlots>::NUM_SLOTS + ", t.as_str()))
+                    },
+                    _ => {
+                        panic!("This type {:?} hasn't been handled", ty);
+                    }
+                };
+                let getter = gen_getter(id, ty, effective_idx as u32);
+                let (setter, setter_name) = gen_setter(id, ty, effective_idx as u32);
                 let get_callarg = quote! {
-                    get_js_arg!(#field_name, cx, call_args, #idx as u32, #conversion_behavior);
+                    get_js_arg!(#field_name, cx, call_args, #effective_idx as u32,
+                                #conversion_behavior);
                 };
                 let setter_invocation = quote! {
                     #setter_name(cx, #field_name)
                 };
                 getters.push(getter);
                 setters.push(setter);
+                slot_counters.push(slot_counter);
                 get_callargs.push(get_callarg);
                 setter_invocations.push(setter_invocation);
             }
             MagicStructCode {
                 getters: getters,
                 setters: setters,
+                slot_counters: slot_counters,
                 get_callargs: get_callargs,
                 setter_invocations: setter_invocations,
             }

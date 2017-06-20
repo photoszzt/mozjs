@@ -3,8 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-use conversions::ToJSValConvertible;
+use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
 use glue::CreateCallArgsFromVp;
+
 extern crate libc;
 
 magic_dom! {
@@ -21,6 +22,7 @@ magic_dom! {
         tag_name: String,
         namespace: String,
         prefix: String,
+        id: String,
         attrs: Vec<attr::Attr>,
         // TODO some of the fields are pointer to Element, those comes in later
     }
@@ -30,10 +32,13 @@ js_getter!(js_get_local_name, get_local_name, Element);
 js_getter!(js_get_tag_name, get_tag_name, Element);
 js_getter!(js_get_namespace, get_namespace, Element);
 js_getter!(js_get_prefix, get_prefix, Element);
+js_getter!(js_get_id, get_id, Element);
 js_getter!(js_get_attrs, get_attrs, Element);
 
+js_setter!(js_set_id, set_id, Element, ());
+
 lazy_static! {
-    pub static ref ELEMENT_PS_ARR: [JSPropertySpec; 6] = [
+    pub static ref ELEMENT_PS_ARR: [JSPropertySpec; 7] = [
         JSPropertySpec::getter(b"local_name\0".as_ptr() as *const libc::c_char,
                                JSPROP_ENUMERATE | JSPROP_PERMANENT,
                                Some(js_get_local_name)),
@@ -46,6 +51,9 @@ lazy_static! {
         JSPropertySpec::getter(b"prefix\0".as_ptr() as *const libc::c_char,
                                JSPROP_ENUMERATE | JSPROP_PERMANENT,
                                Some(js_get_prefix)),
+        JSPropertySpec::getter_setter(b"id\0".as_ptr() as *const libc::c_char,
+                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                               Some(js_get_id), Some(js_set_id)),
         JSPropertySpec::getter(b"attrs\0".as_ptr() as *const libc::c_char,
                                JSPROP_ENUMERATE | JSPROP_PERMANENT,
                                Some(js_get_attrs)),

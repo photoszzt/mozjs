@@ -48,4 +48,3 @@ lazy_static! {
         JSPropertySpec::end_spec(),
     ];
 }
-

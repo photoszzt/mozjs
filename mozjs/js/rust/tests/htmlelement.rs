@@ -114,9 +114,6 @@ if (element.tabIndex != 3) {
 if (element.accessKey != "ackey2") {
     throw Error("element.accessKey is not ackey2");
 }
-if (element.accessKeyLabel != "ackeylabel") {
-    throw Error("element.accessKeyLabel is not ackeylabel");
-}
 if (element.draggable != true) {
     throw Error("element.draggable is not true");
 }
