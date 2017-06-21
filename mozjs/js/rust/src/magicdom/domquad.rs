@@ -21,6 +21,8 @@ magic_dom! {
     }
 }
 
+pub use self::magic_dom_spec_DOMQuad::DOMQuad_constructor as DOMQuad_constructor;
+
 js_getter!(js_get_p1, get_p1, DOMQuad);
 js_getter!(js_get_p2, get_p2, DOMQuad);
 js_getter!(js_get_p3, get_p3, DOMQuad);

@@ -18,6 +18,9 @@ use js::jsval::{StringValue, UndefinedValue};
 use js::magicdom::dompoint::DOMPOINT_CLASS;
 use js::magicdom::dompoint::DOMPOINT_PS_ARR;
 use js::magicdom::dompoint::DOMPoint_constructor;
+use js::magicdom::dompointreadonly::DOMPOINTREADONLY_CLASS;
+use js::magicdom::dompointreadonly::DOMPOINTREADONLY_PS_ARR;
+use js::magicdom::dompointreadonly::DOMPointReadOnly_constructor;
 
 use std::ffi::CStr;
 use std::ptr;
@@ -39,8 +42,15 @@ fn get_and_set() {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
-        rooted!(in(cx) let _dom_point_proto =
+        rooted!(in(cx) let dom_point_readonly_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(),
+                             &DOMPOINTREADONLY_CLASS, Some(DOMPointReadOnly_constructor),
+                             4, DOMPOINTREADONLY_PS_ARR.as_ptr(), std::ptr::null(),
+                             std::ptr::null(), std::ptr::null())
+        );
+
+        rooted!(in(cx) let _dom_point_proto =
+                JS_InitClass(cx, global.handle(), dom_point_readonly_proto.handle(),
                              &DOMPOINT_CLASS, Some(DOMPoint_constructor),
                              4, DOMPOINT_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
