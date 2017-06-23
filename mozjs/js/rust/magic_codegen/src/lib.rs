@@ -106,7 +106,8 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
     let num_reserved_slots = quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS",
                                                         name));
-    let constructor_quote = gen_constructor(inherit, getters.len() as u32, &name, &js_class, &get_callargs, &setter_invocations);
+    let constructor_quote = gen_constructor(inherit, getters.len() as u32, &name, &js_class,
+                                            &get_callargs, &setter_invocations);
 
     quote! {
         extern crate libc;
@@ -126,6 +127,7 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         use std::ptr;
 
         #[allow(non_camel_case_types)]
+        #[derive(Debug)]
         pub struct #name {
             object: *mut JSObject,
         }
@@ -187,6 +189,7 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
                         object: obj,
                     })
                 } else {
+                    debug!("Fail to match from_object");
                     None
                 }
             }
@@ -202,7 +205,8 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
                 if !thisv.is_object() {
                     return None;
                 }
-                #name::from_object(thisv.to_object())
+                // Drop the class checking to let inheritance pass through
+                Some(#name::new(thisv.to_object()))
             }
 
             #(#getters)*
@@ -317,7 +321,7 @@ fn gen_getter(id: &Option<syn::Ident>,
         Some(ref real_id) => format!("get_{}", real_id.to_string()),
         None => panic!("Encounter an empty field. Something wrong..."),
     };
-    let getter_name = quote::Ident::from(getter_str);
+    let getter_name = quote::Ident::from(getter_str.as_str());
     let getter = if idx == 0 && inherit {
         quote!{}
     } else {
@@ -340,7 +344,7 @@ fn gen_setter(id: &Option<syn::Ident>,
         Some(ref real_id) => format!("set_{}", real_id.to_string()),
         None => panic!("Encounter an empty field. Something wrong..."),
     };
-    let setter_name = quote::Ident::from(setter_str);
+    let setter_name = quote::Ident::from(setter_str.as_str());
     let setter = if idx == 0 && inherit {
         quote!{}
     } else {
@@ -395,6 +399,7 @@ fn get_magic_struct_code(variant: &syn::VariantData)
             let mut slot_counters = Vec::new();
             let mut inherit = false;
             let mut upcast = quote!{};
+            let mut inherit_type = &syn::Ty::Infer;
             for (idx, field) in fields.iter().enumerate() {
                 let id = &field.ident;
                 let ty = &field.ty;
@@ -405,6 +410,7 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                 if idx == 0 {
                     inherit = field_name_str == "_inherit";
                     if inherit {
+                        inherit_type = ty;
                         let upcast_name = match *ty {
                             syn::Ty::Path(ref qself, ref path) => {
                                 if let &Some(ref q) = qself {
@@ -427,14 +433,14 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                     }
                 }
                 let effective_idx = if inherit {
-                    match *ty {
+                    match *inherit_type {
                         syn::Ty::Path(ref qself, ref path) => {
                             if let &Some(ref q) = qself {
                                 panic!("Check the qself: {:?}", q);
                             }
                             let mut t = quote::Tokens::new();
                             path.to_tokens(&mut t);
-                            quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS + {}", t.as_str(), idx))
+                            quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS - 1 + {}", t.as_str(), idx))
                         },
                         _ => {
                             panic!("This type {:?} hasn't been handled", ty);
