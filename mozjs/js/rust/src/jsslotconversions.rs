@@ -11,6 +11,9 @@ use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
 use jsapi::root::*;
 use jsval;
 use std::mem;
+use std::fmt;
+
+extern crate libc;
 
 /// A trait to record the number of slots required for the current type
 pub trait NumSlots {
@@ -148,6 +151,10 @@ impl InheritanceSlots for f64 {}
 
 impl<T> NumSlots for Vec<T> {
     const NUM_SLOTS: u32 = 3;
+}
+
+impl<T> InheritanceSlots for Vec<T> {
+    const INHERITANCE_SLOTS: u32 = 3;
 }
 
 impl ToFromJsSlots for bool {
@@ -403,10 +410,24 @@ macro_rules! set_slot_val {
     }
 }
 
+trait VecExt<T>: Sized {
+    fn into_raw_parts(self) -> (*mut T, usize, usize);
+}
+
+impl<T> VecExt<T> for Vec<T> {
+    fn into_raw_parts(mut self) -> (*mut T, usize, usize) {
+        let len = self.len();
+        let cap = self.capacity();
+        let ptr = self.as_mut_ptr();
+        mem::forget(self);
+        (ptr, len, cap)
+    }
+}
+
 /// Notice:
 /// Vec takes up 3 slots which stores the components of the fat pointer separately. It's
 /// structured to avoid a deep copy of the Vec as implemented in the ToJSValConvertible.
-impl<T> ToFromJsSlots for Vec<T> {
+impl<T> ToFromJsSlots for Vec<T> where T: fmt::Debug {
     type Target = Option<Self>;
     const NEEDS_FINALIZE: bool = false;
     const NEEDS_TRACE: bool = false;
@@ -418,13 +439,12 @@ impl<T> ToFromJsSlots for Vec<T> {
             return None;
         }
         let conversion0 =
-            <usize as FromJSValConvertible>::from_jsval(cx, val0.handle(),
-                                                        ConversionBehavior::Default)
+            FromJSValConvertible::from_jsval(cx, val0.handle(), ())
             .expect("Should never put anything into a JS slot that we can't \
                      convert back out again");
         rooted!(in(cx) let undef_val = jsval::UndefinedValue());
         JS_SetReservedSlot(object, offset, &*undef_val);
-        let ptr_num = match conversion0 {
+        let ptr_val: JS::Value = match conversion0 {
             ConversionResult::Success(v) => v,
             ConversionResult::Failure(why) => {
                 panic!("Should never put anything into a JS slot that we \
@@ -434,14 +454,13 @@ impl<T> ToFromJsSlots for Vec<T> {
         };
         get_slot_val!(val1, len, 1, cx, object, offset, ConversionBehavior::Default);
         get_slot_val!(val2, cap, 2, cx, object, offset, ConversionBehavior::Default);
-        let ptr = ptr_num as *mut _;
+        let ptr = ptr_val.to_private() as *mut _;
         Some(Vec::from_raw_parts(ptr, len, cap))
     }
 
     unsafe fn into_slots(self, object: *mut JSObject, cx: *mut JSContext, offset: u32) {
-        let ptr: u64 = self.as_ptr() as usize as u64;
-        let len: u64 = self.len() as u64;
-        let cap: u64 = self.capacity() as u64;
+        let (ptr, len, cap) = self.into_raw_parts();
+        let ptr = jsval::PrivateValue(ptr as *const _ as *const libc::c_void);
         set_slot_val!(prev_val0, ptr, 0, cx, object, offset);
         set_slot_val!(prev_val1, len, 1, cx, object, offset);
         set_slot_val!(prev_val2, cap, 2, cx, object, offset);
