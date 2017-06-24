@@ -250,6 +250,18 @@ impl Runtime {
             }
         }
     }
+
+    pub fn compile_script(&self, glob: JS::HandleObject, script_str: &str, filename: &str,
+                          line_num: u32, script: JS::MutableHandleScript) -> bool {
+        let filename_cstr = ffi::CString::new(filename.as_bytes()).unwrap();
+        debug!("Evaluating script from {} with content {}", filename, script_str);
+        unsafe {
+            let _ac = AutoCompartment::with_obj(self.cx(), glob.get());
+            let options = CompileOptionsWrapper::new(self.cx(), filename_cstr.as_ptr(), line_num);
+            JS_CompileScript(self.cx(), script_str.as_ptr() as *const i8, script_str.len(),
+                             options.ptr as *const _, script)
+        }
+    }
 }
 
 impl Drop for Runtime {

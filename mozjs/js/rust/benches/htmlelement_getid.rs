@@ -8,11 +8,10 @@ extern crate libc;
 extern crate test;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
-use js::rust;
-use js::jsapi::root::JS;
-use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass};
+use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass, JSScript};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
+use js::jsapi::root::JS_ExecuteScript;
 use js::jsval::UndefinedValue;
 use js::magicdom::attr::ATTR_CLASS;
 use js::magicdom::attr::ATTR_PS_ARR;
@@ -64,10 +63,9 @@ fn bench_htmlelement_getid(b: &mut Bencher) {
         );
 
 
-        JS::SetWarningReporter(cx, Some(rust::report_warning));
-
         rooted!(in(cx) let mut rval = UndefinedValue());
-        let _ = rt.evaluate_script(global.handle(), r#"
+        rooted!(in(cx) let mut script = ptr::null_mut() as *mut JSScript);
+        rt.compile_script(global.handle(), r#"
 let attr1 = new Attr("l", "a", "l", "p", "f");
 let attr2 = new Attr("l", "b", "l", "p", "b");
 let element1 = new HtmlElement("la", "a", "l", "pp", "foo", [attr1, attr2], "title123", "en",
@@ -76,17 +74,14 @@ let attr3 = new Attr("l", "a", "l", "p", "f");
 let attr4 = new Attr("l", "b", "l", "p", "b");
 let element2 = new HtmlElement("lb", "b", "l", "pp", "foo", [attr3, attr4], "title456", "es",
 false, "dir", false, 1, "ackey", "ackey456", false, false);
-"#,
-                                   "test", 9, rval.handle_mut());
-        b.iter(|| {
-            let _ = rt.evaluate_script(global.handle(), r#"
 let num = 10240;
 for ( var i = 0; i < num; i++) {
 ret = element2.id;
 element2.id = ret;
 }
-"#,
-                               "test", 5, rval.handle_mut());
+"#, "test", 14, script.handle_mut());
+        b.iter(|| {
+            JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
         });
 
     }
