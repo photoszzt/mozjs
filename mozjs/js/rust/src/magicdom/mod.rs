@@ -6,5 +6,6 @@ pub mod attr;
 pub mod dompointreadonly;
 pub mod dompoint;
 pub mod domquad;
+pub mod node;
 pub mod element;
 pub mod htmlelement;
