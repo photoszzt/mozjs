@@ -25,71 +25,63 @@ pub fn magic_dom(input: TokenStream) -> TokenStream {
     let s = input.to_string();
     let ast = syn::parse_macro_input(&s).unwrap();
 
-    let gen = match ast.body {
-        Body::Enum(_) => panic!("#[derive(magic-dom)] can only be used with structs"),
-        Body::Struct(ref data) => match_struct(&ast, data),
-    };
-    gen.to_string().parse().unwrap()
-}
-
-fn gen_constructor(inherit: bool,
-                   num_fields: u32,
-                   name: &quote::Ident,
-                   js_class: &quote::Ident,
-                   get_callargs: &Vec<quote::Tokens>,
-                   setter_invocations: &Vec<quote::Tokens>) -> quote::Tokens {
-    if inherit {
-        quote!{}
-    } else {
-        let constructor = quote::Ident::from(format!("{}_constructor", name));
-        let from_obj_err = quote::Ident::from(format!("b\"Fail to construct {} from JS \
-                                                       object\\0\" as *const u8 as *const \
-                                                       libc::c_char", name));
-        let arg_num_err = quote::Ident::from(format!("b\"constructor requires exactly {} \
-                                                      arguments\\0\".as_ptr() as *const \
-                                                      libc::c_char", num_fields));
-        quote! {
-            #[allow(non_snake_case)]
-            pub unsafe extern "C" fn #constructor(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-                let call_args = CreateCallArgsFromVp(argc, vp);
-                if call_args._base.argc_ != #num_fields {
-                    JS_ReportErrorASCII(cx, #arg_num_err);
-                    return false;
-                }
-
-                #(#get_callargs)*
-
-                rooted!(in(cx) let jsobj = jsapi::JS_NewObjectForConstructor(cx,
-                                                                             &#js_class as *const _,
-                                                                             &call_args as *const _));
-                if jsobj.is_null() {
-                    JS_ReportErrorASCII(cx, b"Fail to construct JS object\0".as_ptr() as *const libc::c_char);
-                    return false;
-                }
-                let obj = match #name::from_object(jsobj.get()) {
-                    Some(o) => o,
-                    None => {
-                        JS_ReportErrorASCII(cx, #from_obj_err);
-                        return false;
-                    }
-                };
-
-                #(#setter_invocations)*
-
-                call_args.rval().set(ObjectValue(jsobj.get()));
-                true
-            }
-        }
-    }
-}
-
-fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::Tokens {
     let name_spec = &ast.ident;
     let name_spec_str = name_spec.to_string();
     let name_str = name_spec_str
         .split('_')
         .next()
         .expect("Should have a '_' in the magic dom struct name");
+    let rust_gen = match ast.body {
+        Body::Enum(_) => panic!("#[derive(magic-dom)] can only be used with structs"),
+        Body::Struct(ref data) => match_struct(name_str, data),
+    };
+    rust_gen.to_string().parse().unwrap()
+}
+
+fn gen_constructor(name: &quote::Ident,
+                   js_class: &quote::Ident) -> quote::Tokens {
+    let constructor = quote::Ident::from(format!("{}_constructor", name));
+    let from_obj_err = quote::Ident::from(format!("b\"Fail to construct {} from JS \
+                                                   object\\0\" as *const u8 as *const \
+                                                   libc::c_char", name));
+    let arg_num_err = quote::Ident::from(format!("b\"constructor requires exact number of \
+                                                  arguments\\0\".as_ptr() as *const \
+                                                  libc::c_char"));
+    quote! {
+        #[allow(non_snake_case)]
+        pub unsafe extern "C" fn #constructor(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
+            let call_args = CreateCallArgsFromVp(argc, vp);
+
+            rooted!(in(cx) let jsobj = jsapi::JS_NewObjectForConstructor(cx,
+                                                                         &#js_class as *const _,
+                                                                         &call_args as *const _));
+            if jsobj.is_null() {
+                JS_ReportErrorASCII(cx, b"Fail to construct JS object\0".as_ptr() as *const libc::c_char);
+                return false;
+            }
+            let obj = match #name::from_object(jsobj.get()) {
+                Some(o) => o,
+                None => {
+                    JS_ReportErrorASCII(cx, #from_obj_err);
+                    return false;
+                }
+            };
+            if call_args._base.argc_ != obj.num_fields() {
+                JS_ReportErrorASCII(cx, #arg_num_err);
+                return false;
+            }
+
+            if !obj.set_fields(cx, &call_args) {
+                return false;
+            }
+
+            call_args.rval().set(ObjectValue(jsobj.get()));
+            true
+        }
+    }
+}
+
+fn match_struct(name_str: &str, variant: &syn::VariantData) -> quote::Tokens {
     let name_upper = name_str.to_uppercase();
     let name = quote::Ident::from(name_str);
     let name_field = quote::Ident::from(format!("b\"{}\\0\"", name));
@@ -98,18 +90,16 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
         getters,
         setters,
         slot_counters,
-        get_callargs,
-        setter_invocations,
+        set_fields,
+        num_fields,
         upcast,
-        inherit,
     } = get_magic_struct_code(variant);
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
     let num_reserved_slots = quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS",
                                                         name));
-    let constructor_quote = gen_constructor(inherit, getters.len() as u32, &name, &js_class,
-                                            &get_callargs, &setter_invocations);
+    let constructor_quote = gen_constructor(&name, &js_class);
 
-    quote! {
+    let rust_gen = quote! {
         extern crate libc;
         use magicdom::*;
         use jsapi;
@@ -209,11 +199,16 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
                 Some(#name::new(thisv.to_object()))
             }
 
+
             #(#getters)*
 
             #(#setters)*
 
             #upcast
+
+            #set_fields
+
+            #num_fields
         }
 
         impl GCMethods for #name  {
@@ -271,7 +266,8 @@ fn match_struct(ast: &syn::DeriveInput, variant: &syn::VariantData) -> quote::To
             let instance: #name = unsafe { mem::zeroed() };
             assert_eq!(&instance as *const _ as usize, &instance.object as *const _ as usize);
         }
-    }
+    };
+    rust_gen
 }
 
 struct MagicStructCode {
@@ -284,17 +280,14 @@ struct MagicStructCode {
     /// Arithmetic statements for calculating the total number of slots for
     slot_counters: Vec<quote::Ident>,
 
-    /// Code to turn JS Value back to Rust value. Uses get_js_arg! macro
-    get_callargs: Vec<quote::Tokens>,
+    /// Method to set the fields of the struct
+    set_fields: quote::Tokens,
 
-    /// Code to invoke setter to set value
-    setter_invocations: Vec<quote::Tokens>,
+    /// Method to get number of fields in the struct
+    num_fields: quote::Tokens,
 
     /// Method to cast back to parent. Only available when there's object inheritance
     upcast: quote::Tokens,
-
-    /// Whether the dom struct is inherit from another struct
-    inherit: bool,
 }
 
 lazy_static! {
@@ -362,27 +355,39 @@ fn gen_setter(id: &Option<syn::Ident>,
 
 fn gen_get_callargs(ty: &syn::Ty,
                     field_name: &quote::Ident,
-                    effective_idx: &quote::Ident,
-                    ) -> quote::Tokens {
-    let conversion_behavior = match *ty {
-        syn::Ty::Path(ref qself, ref path) => {
-            if let &Some(ref q) = qself {
-                panic!("Check the qself: {:?}", q);
+                    upcast_name: &quote::Ident,
+                    inherit: bool,
+                    idx: usize) -> quote::Tokens {
+    if inherit && idx == 0 {
+        quote!{}
+    } else {
+        let conversion_behavior = match *ty {
+            syn::Ty::Path(ref qself, ref path) => {
+                if let &Some(ref q) = qself {
+                    panic!("Check the qself: {:?}", q);
+                }
+                let seg = &path.segments[0];
+                if INTTYPESET.contains(&seg.ident) {
+                    quote::Ident::from("ConversionBehavior::Default")
+                } else {
+                    quote::Ident::from("()")
+                }
+            },
+            _ => {
+                panic!("This type {:?} hasn't been handled", ty);
             }
-            let seg = &path.segments[0];
-            if INTTYPESET.contains(&seg.ident) {
-                quote::Ident::from("ConversionBehavior::Default")
-            } else {
-                quote::Ident::from("()")
+        };
+        if inherit {
+            quote! {
+                get_js_arg!(#field_name, cx, call_args, self.#upcast_name().num_fields() + #idx as u32 - 1,
+                            #conversion_behavior);
             }
-        },
-        _ => {
-            panic!("This type {:?} hasn't been handled", ty);
+        } else {
+            quote! {
+                get_js_arg!(#field_name, cx, call_args, #idx as u32,
+                            #conversion_behavior);
+            }
         }
-    };
-    quote! {
-        get_js_arg!(#field_name, cx, call_args, #effective_idx,
-                    #conversion_behavior);
     }
 }
 
@@ -399,7 +404,10 @@ fn get_magic_struct_code(variant: &syn::VariantData)
             let mut slot_counters = Vec::new();
             let mut inherit = false;
             let mut upcast = quote!{};
+            let mut inherit_set_fields = quote!{};
+            let mut inherit_num_fields = quote!{0};
             let mut inherit_type = &syn::Ty::Infer;
+            let mut upcast_name = quote::Ident::from("");
             for (idx, field) in fields.iter().enumerate() {
                 let id = &field.ident;
                 let ty = &field.ty;
@@ -411,7 +419,7 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                     inherit = field_name_str == "_inherit";
                     if inherit {
                         inherit_type = ty;
-                        let upcast_name = match *ty {
+                        upcast_name = match *ty {
                             syn::Ty::Path(ref qself, ref path) => {
                                 if let &Some(ref q) = qself {
                                     panic!("Check the qself: {:?}", q);
@@ -429,7 +437,13 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                             pub fn #upcast_name(&self) -> #ty {
                                 #ty::new(self.object)
                             }
-                        }
+                        };
+                        inherit_set_fields = quote!{
+                            self.#upcast_name().set_fields(cx, call_args);
+                        };
+                        inherit_num_fields = quote!{
+                            self.#upcast_name().num_fields()
+                        };
                     }
                 }
                 let effective_idx = if inherit {
@@ -469,9 +483,13 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                 };
                 let getter = gen_getter(id, ty, &effective_idx, inherit, idx);
                 let (setter, setter_name) = gen_setter(id, ty, &effective_idx, inherit, idx);
-                let get_callarg = gen_get_callargs(ty, &field_name, &effective_idx);
-                let setter_invocation = quote! {
-                    obj.#setter_name(cx, #field_name);
+                let get_callarg = gen_get_callargs(ty, &field_name, &upcast_name, inherit, idx);
+                let setter_invocation = if inherit && idx == 0 {
+                    quote!{}
+                } else {
+                    quote! {
+                        self.#setter_name(cx, #field_name);
+                    }
                 };
                 getters.push(getter);
                 setters.push(setter);
@@ -479,14 +497,31 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                 get_callargs.push(get_callarg);
                 setter_invocations.push(setter_invocation);
             }
+            let set_fields = quote! {
+                pub unsafe fn set_fields(&self, cx: *mut JSContext, call_args: &JS::CallArgs) -> bool {
+                    #inherit_set_fields
+                    #(#get_callargs)*
+                    #(#setter_invocations)*
+                    true
+                }
+            };
+            let cur_field_len = if inherit {
+                getters.len() as u32 - 1
+            } else {
+                getters.len() as u32
+            };
+            let num_fields = quote! {
+                pub unsafe fn num_fields(&self) -> u32 {
+                    #inherit_num_fields + #cur_field_len
+                }
+            };
             MagicStructCode {
                 getters: getters,
                 setters: setters,
                 slot_counters: slot_counters,
-                get_callargs: get_callargs,
-                setter_invocations: setter_invocations,
+                set_fields: set_fields,
+                num_fields: num_fields,
                 upcast: upcast,
-                inherit: inherit,
             }
         },
         _ => panic!("Only struct is implemented"),

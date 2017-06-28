@@ -23,8 +23,6 @@ magic_dom! {
     }
 }
 
-pub use self::magic_dom_spec_Attr::Attr_constructor as Attr_constructor;
-
 js_getter!(js_get_identifier_local_name, get_identifier_local_name, Attr);
 js_getter!(js_get_identifier_name, get_identifier_name, Attr);
 js_getter!(js_get_identifier_namespace, get_identifier_namespace, Attr);

@@ -23,8 +23,6 @@ magic_dom! {
     }
 }
 
-pub use self::magic_dom_spec_Node::Node_constructor as Node_constructor;
-
 js_getter!(js_get_node_type, get_node_type, Node);
 js_getter!(js_get_node_name, get_node_name, Node);
 js_getter!(js_get_base_uri, get_base_uri, Node);

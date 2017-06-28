@@ -49,6 +49,7 @@ macro_rules! magic_dom {
             }
         }
         pub use self::$mod_name::$name as $name;
+        pub use self::$mod_name::$constructor_name as $constructor_name;
         pub use self::$mod_name::$class_name as $class_name;
     }
 }
