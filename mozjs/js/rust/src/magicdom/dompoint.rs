@@ -3,8 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-use jsapi;
-use jsval::ObjectValue;
 use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
 use glue::CreateCallArgsFromVp;
 use jsslotconversions::ToFromJsSlots;

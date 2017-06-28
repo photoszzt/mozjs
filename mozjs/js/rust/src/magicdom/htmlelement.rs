@@ -3,8 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-use jsapi;
-use jsval::ObjectValue;
 use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
                   ToJSValConvertible};
 use glue::CreateCallArgsFromVp;
@@ -20,32 +18,32 @@ magic_dom! {
     magic_dom_spec_HtmlElement,
     struct HtmlElement_spec {
         _inherit: element::Element,
-        title: String,
-        lang: String,
+        title: *mut JSString,
+        lang: *mut JSString,
         translate: bool,
-        dir: String,
+        dir: *mut JSString,
         hidden: bool,
         tabIndex: i32,
-        accessKey: String,
-        accessKeyLabel: String,
+        accessKey: *mut JSString,
+        accessKeyLabel: *mut JSString,
         draggable: bool,
         spellcheck: bool,
     }
 }
 
 impl HtmlElement {
-    gen_getter_inherit!(get_local_name, String, as_Element);
-    gen_getter_inherit!(get_tag_name, String, as_Element);
-    gen_getter_inherit!(get_namespace, String, as_Element);
-    gen_getter_inherit!(get_prefix, String, as_Element);
-    gen_getter_inherit!(get_id, String, as_Element);
+    gen_getter_inherit!(get_local_name, *mut JSString, as_Element);
+    gen_getter_inherit!(get_tag_name, *mut JSString, as_Element);
+    gen_getter_inherit!(get_namespace, *mut JSString, as_Element);
+    gen_getter_inherit!(get_prefix, *mut JSString, as_Element);
+    gen_getter_inherit!(get_id, *mut JSString, as_Element);
     gen_getter_inherit!(get_attrs, Vec<attr::Attr>, as_Element);
 
-    gen_setter_inherit!(set_local_name, String, as_Element);
-    gen_setter_inherit!(set_tag_name, String, as_Element);
-    gen_setter_inherit!(set_namespace, String, as_Element);
-    gen_setter_inherit!(set_prefix, String, as_Element);
-    gen_setter_inherit!(set_id, String, as_Element);
+    gen_setter_inherit!(set_local_name, *mut JSString, as_Element);
+    gen_setter_inherit!(set_tag_name, *mut JSString, as_Element);
+    gen_setter_inherit!(set_namespace, *mut JSString, as_Element);
+    gen_setter_inherit!(set_prefix, *mut JSString, as_Element);
+    gen_setter_inherit!(set_id, *mut JSString, as_Element);
     gen_setter_inherit!(set_attrs, Vec<attr::Attr>, as_Element);
 }
 

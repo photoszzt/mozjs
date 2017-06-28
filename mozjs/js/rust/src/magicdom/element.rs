@@ -18,11 +18,11 @@ magic_dom! {
 
         // TODO need to check the local_name, tag_name, namespace and prefix are valid html element
         // They should be Gekco Atom from the servo description
-        local_name: String,
-        tag_name: String,
-        namespace: String,
-        prefix: String,
-        id: String,
+        local_name: *mut JSString,
+        tag_name: *mut JSString,
+        namespace: *mut JSString,
+        prefix: *mut JSString,
+        id: *mut JSString,
         attrs: Vec<attr::Attr>,
         // TODO some of the fields are pointer to Element, those comes in later
     }

@@ -7,8 +7,6 @@ extern crate js;
 extern crate libc;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
-use js::rust;
-use js::jsapi::root::JS;
 use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;

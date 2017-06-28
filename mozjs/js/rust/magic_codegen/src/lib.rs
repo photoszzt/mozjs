@@ -1,4 +1,5 @@
 #![feature(proc_macro)]
+#![feature(box_patterns)]
 #![recursion_limit="256"]
 extern crate proc_macro;
 extern crate syn;
@@ -6,6 +7,8 @@ extern crate syn;
 extern crate quote;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
 
 use syn::{Body, VariantData};
 use proc_macro::TokenStream;
@@ -107,7 +110,6 @@ fn match_struct(name_str: &str, variant: &syn::VariantData) -> quote::Tokens {
         use rust::{GCMethods, RootKind, maybe_wrap_value};
         use glue::CreateCallArgsFromVp;
         use jsval::{DoubleValue, ObjectOrNullValue, ObjectValue};
-        use rust::ToNumber;
         use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
                           ToJSValConvertible};
         use jsslotconversions::{InheritanceSlots, NumSlots, ToFromJsSlots};
@@ -374,7 +376,7 @@ fn gen_get_callargs(ty: &syn::Ty,
                 }
             },
             _ => {
-                panic!("This type {:?} hasn't been handled", ty);
+                quote::Ident::from("()")
             }
         };
         if inherit {
@@ -430,7 +432,8 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                                 quote::Ident::from(format!("as_{}", t.as_str()))
                             },
                             _ => {
-                                panic!("This type {:?} hasn't been handled", ty);
+                                debug!("Generating empty upcast name for {:?}", ty);
+                                quote::Ident::from("")
                             }
                         };
                         upcast = quote! {
@@ -454,32 +457,25 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                             }
                             let mut t = quote::Tokens::new();
                             path.to_tokens(&mut t);
-                            quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS - 1 + {}", t.as_str(), idx))
+                            quote::Ident::from(format!(
+                                "<{} as InheritanceSlots>::INHERITANCE_SLOTS - 1 + {}",
+                                t.as_str(), idx))
                         },
                         _ => {
-                            panic!("This type {:?} hasn't been handled", ty);
+                            debug!("Generating 0 inheritance slot for {:?}", inherit_type);
+                            quote::Ident::from("0 + ")
                         }
                     }
                 } else {
                     quote::Ident::from(format!("{}", idx))
                 };
                 let field_name = quote::Ident::from(field_name_str);
-                let slot_counter = match *ty {
-                    syn::Ty::Path(ref qself, ref path) => {
-                        if let &Some(ref q) = qself {
-                            panic!("Check the qself: {:?}", q);
-                        }
-                        let mut t = quote::Tokens::new();
-                        path.to_tokens(&mut t);
-                        if inherit && idx == 0 {
-                            quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS + ", t.as_str()))
-                        } else {
-                            quote::Ident::from(format!("<{} as NumSlots>::NUM_SLOTS + ", t.as_str()))
-                        }
-                    },
-                    _ => {
-                        panic!("This type {:?} hasn't been handled", ty);
-                    }
+                let mut tt = quote::Tokens::new();
+                ty.to_tokens(&mut tt);
+                let slot_counter = if inherit && idx == 0 {
+                    quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS + ", tt.as_str()))
+                } else {
+                    quote::Ident::from(format!("<{} as NumSlots>::NUM_SLOTS + ", tt.as_str()))
                 };
                 let getter = gen_getter(id, ty, &effective_idx, inherit, idx);
                 let (setter, setter_name) = gen_setter(id, ty, &effective_idx, inherit, idx);

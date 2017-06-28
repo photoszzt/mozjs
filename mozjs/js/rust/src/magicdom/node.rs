@@ -15,11 +15,11 @@ magic_dom! {
     magic_dom_spec_Node,
     struct Node_struct {
         node_type: u16,
-        node_name: String, // DOMString
-        base_uri: String, // USVString
+        node_name: *mut JSString, // DOMString
+        base_uri: *mut JSString, // USVString
         is_connected: bool,
-        node_value: String, // DOMString
-        text_content: String,  // DOMString
+        node_value: *mut JSString, // DOMString
+        text_content: *mut JSString,  // DOMString
     }
 }
 
