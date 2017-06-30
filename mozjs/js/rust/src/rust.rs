@@ -1143,23 +1143,23 @@ impl JSPropertySpec {
         }
     }
 
-    pub fn setter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
-                        -> JSPropertySpec {
+    pub fn getter_selfhosted(name: *const ::std::os::raw::c_char, flags: u8,
+                             funname: *const ::std::os::raw::c_char) -> JSPropertySpec {
         debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
         JSPropertySpec {
             name: name,
-            flags: flags | JSPROP_SHARED,
+            flags: flags | JSPROP_SHARED | JSPROP_GETTER,
             __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
                 accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
                     getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
-                        native: JSNativeWrapper {
-                            op: None,
-                            info: ptr::null(),
+                        selfHosted: JSPropertySpec_SelfHostedWrapper {
+                            unused: 0 as *mut _,
+                            funname: funname,
                         },
                     },
                     setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
                         native: JSNativeWrapper {
-                            op: func,
+                            op: None,
                             info: ptr::null(),
                         },
                     }
@@ -1189,6 +1189,34 @@ impl JSPropertySpec {
                         native: JSNativeWrapper {
                             op: s_f,
                             info: ptr::null(),
+                        },
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn getter_setter_selfhosted(name: *const ::std::os::raw::c_char,
+                                    flags: u8,
+                                    g_f: *const ::std::os::raw::c_char,
+                                    s_f: *const ::std::os::raw::c_char)
+                        -> JSPropertySpec {
+        debug_assert_eq!(flags & !(jsapi::JSPROP_ENUMERATE | jsapi::JSPROP_PERMANENT), 0);
+        JSPropertySpec {
+            name: name,
+            flags: flags | JSPROP_SHARED | JSPROP_GETTER | JSPROP_SETTER,
+            __bindgen_anon_1: JSPropertySpec__bindgen_ty_1 {
+                accessors: JSPropertySpec__bindgen_ty_1__bindgen_ty_1 {
+                    getter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {
+                        selfHosted: JSPropertySpec_SelfHostedWrapper {
+                            unused: 0 as *mut _,
+                            funname: g_f,
+                        },
+                    },
+                    setter: JSPropertySpec__bindgen_ty_1__bindgen_ty_1__bindgen_ty_2 {
+                        selfHosted: JSPropertySpec_SelfHostedWrapper {
+                            unused: 0 as *mut _,
+                            funname: s_f,
                         },
                     }
                 }

@@ -77,9 +77,9 @@ false, "dir", false, 1, "ackey", "ackey456", false, false);
 let num = 10240;
 for ( var i = 0; i < num; i++) {
 ret = element2.id;
-element2.id = ret;
 }
 "#, "test", 14, script.handle_mut());
+        JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
         b.iter(|| {
             JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
         });
