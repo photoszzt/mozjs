@@ -11,6 +11,7 @@ use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
 use jsapi::root::*;
 use jsval;
 use std::mem;
+use std::ptr;
 use std::fmt;
 
 extern crate libc;
@@ -134,6 +135,8 @@ impl NumSlots for u64 {}
 impl NumSlots for i64 {}
 impl NumSlots for f32 {}
 impl NumSlots for f64 {}
+impl<T> NumSlots for *const T {}
+impl<T> NumSlots for *mut T {}
 
 impl InheritanceSlots for bool {}
 impl InheritanceSlots for str {}
@@ -464,6 +467,39 @@ impl<T> ToFromJsSlots for Vec<T> where T: fmt::Debug {
         set_slot_val!(prev_val0, ptr, 0, cx, object, offset);
         set_slot_val!(prev_val1, len, 1, cx, object, offset);
         set_slot_val!(prev_val2, cap, 2, cx, object, offset);
+    }
+
+    fn finalize(_fop: *mut js::FreeOp, _obj: *mut JSObject, _offset: u32) {
+    }
+
+    fn trace(_trc: *mut JSTracer, _obj: *mut JSObject, _offset: u32) {
+    }
+}
+
+impl ToFromJsSlots for *mut JSString {
+    type Target = Self;
+    const NEEDS_FINALIZE: bool = false;
+    const NEEDS_TRACE: bool = false;
+
+    unsafe fn from_slots(object: *mut JSObject, cx: *mut JSContext, offset: u32)
+                         -> Self::Target {
+        rooted!(in(cx) let val = JS_GetReservedSlot(object, offset));
+        if val.is_string() {
+            val.to_string()
+        } else if val.is_null() {
+            ptr::null_mut()
+        } else {
+            panic!("<*mut JSString as ToFromJsSlots>::from_slots called on non-string/null slot");
+        }
+    }
+
+    unsafe fn into_slots(self, object: *mut JSObject, cx: *mut JSContext, offset: u32) {
+        let ptr = if self.is_null() {
+            jsval::NullValue()
+        } else {
+            jsval::StringValue(&*self)
+        };
+        set_slot_val!(prev_val0, ptr, 0, cx, object, offset);
     }
 
     fn finalize(_fop: *mut js::FreeOp, _obj: *mut JSObject, _offset: u32) {

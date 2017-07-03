@@ -7,6 +7,7 @@ authors = ["zzhu <zzhu@mozilla.com>"]
 syn = "0.11"
 quote = "0.3"
 lazy_static = "0.2.1"
+log = "0.3"
 
 [lib]
 proc-macro = true

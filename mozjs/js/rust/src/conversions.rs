@@ -720,3 +720,17 @@ impl ToJSValConvertible for Heap<*mut JSObject> {
     }
 }
 
+impl ToJSValConvertible for *mut JSString {
+    #[inline]
+    unsafe fn to_jsval(&self, _cx: *mut JSContext, rval: JS::MutableHandleValue) {
+        rval.set(StringValue(&**self));
+    }
+}
+
+impl FromJSValConvertible for *mut JSString {
+    type Config = ();
+    unsafe fn from_jsval(cx: *mut JSContext, val: JS::HandleValue, _option: ())
+                         -> Result<ConversionResult<*mut JSString>, ()> {
+        Ok(ToString(cx, val)).map(ConversionResult::Success)
+    }
+}

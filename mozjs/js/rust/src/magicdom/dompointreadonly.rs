@@ -21,9 +21,6 @@ magic_dom! {
     }
 }
 
-pub use self::magic_dom_spec_DOMPointReadOnly::DOMPointReadOnly_constructor as
-    DOMPointReadOnly_constructor;
-
 js_getter!(js_get_x, get_x, DOMPointReadOnly);
 js_getter!(js_get_y, get_y, DOMPointReadOnly);
 js_getter!(js_get_z, get_z, DOMPointReadOnly);

@@ -15,15 +15,13 @@ magic_dom! {
     Attr_constructor,
     magic_dom_spec_Attr,
     struct Attr_spec {
-        identifier_local_name: String,
-        identifier_name: String,
-        identifier_namespace: String,
-        identifier_prefix: String,
-        value: String, // TODO should be a enum inside servo fake it with one of possible value
+        identifier_local_name: *mut JSString,
+        identifier_name: *mut JSString,
+        identifier_namespace: *mut JSString,
+        identifier_prefix: *mut JSString,
+        value: *mut JSString, // TODO should be a enum inside servo fake it with one of possible value
     }
 }
-
-pub use self::magic_dom_spec_Attr::Attr_constructor as Attr_constructor;
 
 js_getter!(js_get_identifier_local_name, get_identifier_local_name, Attr);
 js_getter!(js_get_identifier_name, get_identifier_name, Attr);

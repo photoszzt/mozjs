@@ -15,15 +15,13 @@ magic_dom! {
     magic_dom_spec_Node,
     struct Node_struct {
         node_type: u16,
-        node_name: String, // DOMString
-        base_uri: String, // USVString
+        node_name: *mut JSString, // DOMString
+        base_uri: *mut JSString, // USVString
         is_connected: bool,
-        node_value: String, // DOMString
-        text_content: String,  // DOMString
+        node_value: *mut JSString, // DOMString
+        text_content: *mut JSString,  // DOMString
     }
 }
-
-pub use self::magic_dom_spec_Node::Node_constructor as Node_constructor;
 
 js_getter!(js_get_node_type, get_node_type, Node);
 js_getter!(js_get_node_name, get_node_name, Node);

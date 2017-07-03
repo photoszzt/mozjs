@@ -7,8 +7,6 @@ extern crate js;
 extern crate libc;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
-use js::rust;
-use js::jsapi::root::JS;
 use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
@@ -36,7 +34,7 @@ fn get_and_set() {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
-        rooted!(in(cx) let element_proto =
+        rooted!(in(cx) let _node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
                              5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())

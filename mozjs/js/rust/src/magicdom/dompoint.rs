@@ -3,8 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-use jsapi;
-use jsval::ObjectValue;
 use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
 use glue::CreateCallArgsFromVp;
 use jsslotconversions::ToFromJsSlots;
@@ -59,45 +57,4 @@ lazy_static! {
                                       Some(js_get_w), Some(js_set_w)),
         JSPropertySpec::end_spec(),
     ];
-}
-
-#[allow(non_snake_case)]
-pub unsafe extern "C" fn DOMPoint_constructor(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-    let call_args = CreateCallArgsFromVp(argc, vp);
-    if call_args._base.argc_ != 4 {
-        JS_ReportErrorASCII(cx, b"constructor requires exactly 4 \
-                                  arguments\0".as_ptr() as *const
-                            libc::c_char);
-        return false;
-    }
-
-    rooted!(in(cx) let jsobj = jsapi::JS_NewObjectForConstructor(cx,
-                                                                 &DOMPOINT_CLASS as *const _,
-                                                                 &call_args as *const _));
-    if jsobj.is_null() {
-        JS_ReportErrorASCII(cx, b"Fail to construct JS object\0".as_ptr() as *const libc::c_char);
-        return false;
-    }
-    let obj = match DOMPoint::from_object(jsobj.get()) {
-        Some(o) => o,
-        None => {
-            JS_ReportErrorASCII(cx, b"Fail to construct DOMPoint from JS \
-                                object\0" as *const u8 as *const
-                                libc::c_char);
-            return false;
-        }
-    };
-
-    get_js_arg!(x, cx, call_args, 0, ());
-    get_js_arg!(y, cx, call_args, 1, ());
-    get_js_arg!(z, cx, call_args, 2, ());
-    get_js_arg!(w, cx, call_args, 3, ());
-
-    obj.set_x(cx, x);
-    obj.set_y(cx, y);
-    obj.set_z(cx, z);
-    obj.set_w(cx, w);
-
-    call_args.rval().set(ObjectValue(jsobj.get()));
-    true
 }
