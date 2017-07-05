@@ -123,6 +123,7 @@ const EXTRA_CLANG_FLAGS: &'static [&'static str] = &[
     "-x", "c++",
     "-std=c++14",
     "-DRUST_BINDGEN",
+    "-DJS_GC_ZEAL",
 ];
 
 /// Types which we want to generate bindings for (and every other type they

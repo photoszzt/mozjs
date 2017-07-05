@@ -14,6 +14,11 @@ use syn::{Body, VariantData};
 use proc_macro::TokenStream;
 use std::collections::HashSet;
 use quote::ToTokens;
+use std::error::Error;
+use std::io::prelude::*;
+use std::fs::File;
+use std::fs::create_dir_all;
+use std::path::Path;
 
 /// The `#[derive(MagicDom)]` implementation.
 ///
@@ -34,9 +39,41 @@ pub fn magic_dom(input: TokenStream) -> TokenStream {
         .split('_')
         .next()
         .expect("Should have a '_' in the magic dom struct name");
-    let rust_gen = match ast.body {
+    let (rust_gen, js_gen) = match ast.body {
         Body::Enum(_) => panic!("#[derive(magic-dom)] can only be used with structs"),
         Body::Struct(ref data) => match_struct(name_str, data),
+    };
+    let manifest_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../src/magicdom/js");
+    let dir_path = Path::new(manifest_dir);
+    if !dir_path.exists() {
+        match create_dir_all(dir_path) {
+            Err(why) => {
+                panic!("couldn't create dir: {}", why.description())
+            },
+            Ok(_) => (),
+        }
+    }
+    let path_string = format!("{}/{}.js", manifest_dir, name_str);
+    let path = Path::new(path_string.as_str());
+    let display = path.display();
+    let mut file = match File::create(&path) {
+        Err(why) => panic!("couldn't create {}: {}",
+                           display,
+                           why.description()),
+        Ok(file) => file,
+    };
+    match file.write_all(js_gen.to_string().as_bytes()) {
+        Err(why) => {
+            panic!("couldn't write to {}: {}", display,
+                   why.description())
+        },
+        Ok(_) => (),
+    };
+    match file.sync_all() {
+        Err(why) => {
+            panic!("couldn't sync: {}", why.description())
+        },
+        Ok(_) => (),
     };
     rust_gen.to_string().parse().unwrap()
 }
@@ -84,23 +121,28 @@ fn gen_constructor(name: &quote::Ident,
     }
 }
 
-fn match_struct(name_str: &str, variant: &syn::VariantData) -> quote::Tokens {
+fn match_struct(name_str: &str, variant: &syn::VariantData) -> (quote::Tokens, quote::Tokens) {
     let name_upper = name_str.to_uppercase();
     let name = quote::Ident::from(name_str);
     let name_field = quote::Ident::from(format!("b\"{}\\0\"", name));
     let js_class = quote::Ident::from(format!("{}_CLASS", name_upper));
     let MagicStructCode {
-        getters,
-        setters,
+        rust_getters,
+        rust_setters,
+        js_getters,
+        js_setters,
         slot_counters,
+        js_slot_counters,
         set_fields,
         num_fields,
         upcast,
-    } = get_magic_struct_code(variant);
+    } = get_magic_struct_code(name_str, variant);
     let test_fn_name = quote::Ident::from(format!("test_{}_magic_layout()", name));
     let num_reserved_slots = quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS",
                                                         name));
     let constructor_quote = gen_constructor(&name, &js_class);
+    let js_inherit_slot_name = quote::Ident::from(format!("{}_inherit_slot", name_str));
+    let js_numslot_name = quote::Ident::from(format!("{}_numslot", name_str));
 
     let rust_gen = quote! {
         extern crate libc;
@@ -202,9 +244,9 @@ fn match_struct(name_str: &str, variant: &syn::VariantData) -> quote::Tokens {
             }
 
 
-            #(#getters)*
+            #(#rust_getters)*
 
-            #(#setters)*
+            #(#rust_setters)*
 
             #upcast
 
@@ -269,18 +311,40 @@ fn match_struct(name_str: &str, variant: &syn::VariantData) -> quote::Tokens {
             assert_eq!(&instance as *const _ as usize, &instance.object as *const _ as usize);
         }
     };
-    rust_gen
+    let js_gen = quote!{
+        function #js_inherit_slot_name() {
+            return #(#js_slot_counters)* 0;
+        }
+
+        function #js_numslot_name() {
+            return 1;
+        }
+
+        #(#js_getters)*
+
+        #(#js_setters)*
+    };
+    (rust_gen, js_gen)
 }
 
 struct MagicStructCode {
     /// Rust getters for the data stored in slots.
-    getters: Vec<quote::Tokens>,
+    rust_getters: Vec<quote::Tokens>,
 
     /// Rust setters for the data stored in slots.
-    setters: Vec<quote::Tokens>,
+    rust_setters: Vec<quote::Tokens>,
 
-    /// Arithmetic statements for calculating the total number of slots for
+    /// JS getters for the data stored in slots.
+    js_getters: Vec<quote::Tokens>,
+
+    /// JS setters for the data stored in slots.
+    js_setters: Vec<quote::Tokens>,
+
+    /// Arithmetic statements for calculating the total number of slots
     slot_counters: Vec<quote::Ident>,
+
+    /// Arithmetic statements for calculating the total number of slots (JS side)
+    js_slot_counters: Vec<quote::Ident>,
 
     /// Method to set the fields of the struct
     set_fields: quote::Tokens,
@@ -310,49 +374,74 @@ lazy_static! {
 fn gen_getter(id: &Option<syn::Ident>,
               ty: &syn::Ty,
               effective_idx: &quote::Ident,
+              js_effective_idx: &quote::Ident,
               inherit: bool,
-              idx: usize) -> quote::Tokens {
-    let getter_str = match *id {
-        Some(ref real_id) => format!("get_{}", real_id.to_string()),
+              idx: usize,
+              name_str: &str) -> (quote::Tokens, quote::Tokens) {
+    let (rust_getter_str, js_getter_str) = match *id {
+        Some(ref real_id) => {
+            let id_str = real_id.to_string();
+            (format!("get_{}", id_str), format!("{}_get_{}", name_str, id_str))
+        },
         None => panic!("Encounter an empty field. Something wrong..."),
     };
-    let getter_name = quote::Ident::from(getter_str.as_str());
-    let getter = if idx == 0 && inherit {
-        quote!{}
+    let rust_getter_name = quote::Ident::from(rust_getter_str.as_str());
+    let js_getter_name = quote::Ident::from(js_getter_str.as_str());
+    let (rust_getter, js_getter) = if idx == 0 && inherit {
+        (quote!{}, quote!{})
     } else {
-        quote! {
-            pub unsafe fn #getter_name (&self, cx: *mut JSContext) -> <#ty as ToFromJsSlots>::Target {
+        let rust_getter = quote! {
+            pub unsafe fn #rust_getter_name (&self, cx: *mut JSContext) -> <#ty as ToFromJsSlots>::Target {
                 let jsobj = self.object;
                 <#ty as ToFromJsSlots>::from_slots(jsobj, cx, #effective_idx)
             }
-        }
+        };
+        let js_getter = quote! {
+            function #js_getter_name() {
+                let res = UnsafeGetReservedSlot(this, #js_effective_idx);
+                return res;
+            }
+        };
+        (rust_getter, js_getter)
     };
-    getter
+    (rust_getter, js_getter)
 }
 
 fn gen_setter(id: &Option<syn::Ident>,
               ty: &syn::Ty,
               effective_idx: &quote::Ident,
+              js_effective_idx: &quote::Ident,
               inherit: bool,
-              idx: usize) -> (quote::Tokens, quote::Ident) {
-    let setter_str = match *id {
-        Some(ref real_id) => format!("set_{}", real_id.to_string()),
+              idx: usize,
+              name_str: &str) -> (quote::Tokens, quote::Tokens, quote::Ident) {
+    let (rust_setter_str, js_setter_str) = match *id {
+        Some(ref real_id) => {
+            let id_str = real_id.to_string();
+            (format!("set_{}", id_str), format!("{}_set_{}", name_str, id_str))
+        },
         None => panic!("Encounter an empty field. Something wrong..."),
     };
-    let setter_name = quote::Ident::from(setter_str.as_str());
-    let setter = if idx == 0 && inherit {
-        quote!{}
+    let rust_setter_name = quote::Ident::from(rust_setter_str.as_str());
+    let js_setter_name = quote::Ident::from(js_setter_str.as_str());
+    let (rust_setter, js_setter) = if idx == 0 && inherit {
+        (quote!{}, quote!{})
     } else {
-        quote! {
-            pub fn #setter_name (&self, cx: *mut JSContext, t: #ty) {
+        let rust_setter = quote! {
+            pub fn #rust_setter_name (&self, cx: *mut JSContext, t: #ty) {
                 unsafe {
                     let jsobj = self.object;
                     t.into_slots(jsobj, cx, #effective_idx);
                 }
             }
-        }
+        };
+        let js_setter = quote! {
+            function #js_setter_name(v) {
+                UnsafeSetReservedSlot(this, #js_effective_idx, v);
+            }
+        };
+        (rust_setter, js_setter)
     };
-    (setter, setter_name)
+    (rust_setter, js_setter, rust_setter_name)
 }
 
 fn gen_get_callargs(ty: &syn::Ty,
@@ -393,23 +482,173 @@ fn gen_get_callargs(ty: &syn::Ty,
     }
 }
 
+fn gen_slot_counter(ty: &syn::Ty,
+                    parent_name: &quote::Ident,
+                    inherit: bool,
+                    idx: usize,
+                    ) -> (quote::Ident, quote::Ident) {
+    let mut tt = quote::Tokens::new();
+    ty.to_tokens(&mut tt);
+    let type_str = tt.as_str();
+    if inherit && idx == 0 {
+        (quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS + ", type_str)),
+         quote::Ident::from(format!("{}_inherit_slot() + ", parent_name)))
+    } else {
+        let (type_first_part, type_last_part) = match *ty {
+            syn::Ty::Path(ref qself, ref path) => {
+                if let &Some(ref q) = qself {
+                    panic!("Check the qself: {:?}", q);
+                }
+                let mut t = quote::Tokens::new();
+                let mut t2 = quote::Tokens::new();
+                let seg = &path.segments[0];
+                let seg2 = &path.segments[path.segments.len() - 1];
+                seg.to_tokens(&mut t);
+                seg2.to_tokens(&mut t2);
+                (t.to_string(), t2.to_string())
+            },
+            _ => {
+                ("".to_string(), "".to_string())
+            }
+        };
+        let js_numslot = if type_first_part.starts_with("Vec") {
+            quote::Ident::from("Vec_numslot() + ")
+        } else if type_last_part != "" {
+            match type_last_part.as_str() {
+                "bool" | "str" | "String" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" |
+                "i64" | "f32" | "f64" => quote::Ident::from("1 + "),
+                _ => quote::Ident::from(format!("{}_numslot() + ", type_last_part)),
+            }
+        } else if type_str.contains("String") {
+            quote::Ident::from("1 + ")
+        } else {
+            quote::Ident::from(format!("{}_numslot() + ", type_str))
+        };
+        (quote::Ident::from(format!("<{} as NumSlots>::NUM_SLOTS + ", type_str)),
+         js_numslot)
+
+    }
+}
+
+fn gen_effective_idx(first_field: &syn::Field,
+                     parent_name: &quote::Ident,
+                     inherit: bool,
+                     idx: usize) -> (quote::Ident, quote::Ident) {
+    let (effective_idx, js_effective_idx) = if inherit {
+        let mut t = quote::Tokens::new();
+        first_field.ty.to_tokens(&mut t);
+        (quote::Ident::from(format!(
+            "<{} as InheritanceSlots>::INHERITANCE_SLOTS - 1 + {}",
+            t.as_str(), idx)),
+         quote::Ident::from(format!(
+             "{}_inherit_slot() - 1 + {}",
+             parent_name, idx))
+        )
+    } else {
+        (quote::Ident::from(format!("{}", idx)),
+         quote::Ident::from(format!("{}", idx)))
+    };
+    (effective_idx, js_effective_idx)
+}
+
+struct InheritanceStruct {
+    /// Whether there's inheritance in the struct
+    inherit: bool,
+
+    /// Name of the parent class
+    parent_name: quote::Ident,
+
+    /// Name of the upcast method to the parent class
+    upcast_name: quote::Ident,
+
+    /// Method to upcast to parent class
+    upcast: quote::Tokens,
+
+    /// Method code to set fields using parent class's method
+    inherit_set_fields: quote::Tokens,
+
+    /// Method code to call num_fields method of the parent class
+    inherit_num_fields: quote::Tokens,
+}
+
+fn check_inheritance(field: &syn::Field) -> InheritanceStruct {
+    let id = &field.ident;
+    let ty = &field.ty;
+    let field_name_str = match *id {
+        Some(ref real_id) => format!("{}", real_id.to_string()),
+        None => panic!("Encounter an empty field. Something wrong..."),
+    };
+    if field_name_str == "_inherit" {
+        let parent_name = match *ty {
+            syn::Ty::Path(ref qself, ref path) => {
+                if let &Some(ref q) = qself {
+                    panic!("Check the qself: {:?}", q);
+                }
+                let mut t = quote::Tokens::new();
+                let seg = &path.segments[path.segments.len()-1];
+                seg.to_tokens(&mut t);
+                quote::Ident::from(format!("{}", t.as_str()))
+            },
+            _ => {
+                debug!("Generating empty upcast name for {:?}", ty);
+                quote::Ident::from("")
+            }
+        };
+        let upcast_name = quote::Ident::from(format!("as_{}", parent_name));
+        let upcast = quote! {
+            pub fn #upcast_name(&self) -> #ty {
+                #ty::new(self.object)
+            }
+        };
+        let inherit_set_fields = quote!{
+            self.#upcast_name().set_fields(cx, call_args);
+        };
+        let inherit_num_fields = quote!{
+            self.#upcast_name().num_fields()
+        };
+        InheritanceStruct {
+            inherit: true,
+            parent_name,
+            upcast_name,
+            upcast,
+            inherit_set_fields,
+            inherit_num_fields,
+        }
+    } else {
+        InheritanceStruct {
+            inherit: false,
+            parent_name: quote::Ident::from(""),
+            upcast_name: quote::Ident::from(""),
+            upcast: quote!{},
+            inherit_set_fields: quote!{},
+            inherit_num_fields: quote!{0},
+        }
+    }
+}
+
 /// This function generates a struct which consists the definition of the struct, the
 /// definition of the slot number and Rust getters and setters for the data stored in slots
-fn get_magic_struct_code(variant: &syn::VariantData)
+fn get_magic_struct_code(name_str: &str, variant: &syn::VariantData)
                          -> MagicStructCode {
     let res = match *variant {
         VariantData::Struct(ref fields) => {
-            let mut getters = Vec::new();
-            let mut setters = Vec::new();
+            let mut rust_getters = Vec::new();
+            let mut rust_setters = Vec::new();
+            let mut js_getters = Vec::new();
+            let mut js_setters = Vec::new();
             let mut get_callargs = Vec::new();
             let mut setter_invocations = Vec::new();
             let mut slot_counters = Vec::new();
-            let mut inherit = false;
-            let mut upcast = quote!{};
-            let mut inherit_set_fields = quote!{};
-            let mut inherit_num_fields = quote!{0};
-            let mut inherit_type = &syn::Ty::Infer;
-            let mut upcast_name = quote::Ident::from("");
+            let mut js_slot_counters = Vec::new();
+            let first_field = &fields[0];
+            let InheritanceStruct{
+                inherit,
+                parent_name,
+                upcast_name,
+                upcast,
+                inherit_set_fields,
+                inherit_num_fields,
+            } = check_inheritance(first_field);
             for (idx, field) in fields.iter().enumerate() {
                 let id = &field.ident;
                 let ty = &field.ty;
@@ -417,68 +656,16 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                     Some(ref real_id) => format!("{}", real_id.to_string()),
                     None => panic!("Encounter an empty field. Something wrong..."),
                 };
-                if idx == 0 {
-                    inherit = field_name_str == "_inherit";
-                    if inherit {
-                        inherit_type = ty;
-                        upcast_name = match *ty {
-                            syn::Ty::Path(ref qself, ref path) => {
-                                if let &Some(ref q) = qself {
-                                    panic!("Check the qself: {:?}", q);
-                                }
-                                let mut t = quote::Tokens::new();
-                                let seg = &path.segments[path.segments.len()-1];
-                                seg.to_tokens(&mut t);
-                                quote::Ident::from(format!("as_{}", t.as_str()))
-                            },
-                            _ => {
-                                debug!("Generating empty upcast name for {:?}", ty);
-                                quote::Ident::from("")
-                            }
-                        };
-                        upcast = quote! {
-                            pub fn #upcast_name(&self) -> #ty {
-                                #ty::new(self.object)
-                            }
-                        };
-                        inherit_set_fields = quote!{
-                            self.#upcast_name().set_fields(cx, call_args);
-                        };
-                        inherit_num_fields = quote!{
-                            self.#upcast_name().num_fields()
-                        };
-                    }
-                }
-                let effective_idx = if inherit {
-                    match *inherit_type {
-                        syn::Ty::Path(ref qself, ref path) => {
-                            if let &Some(ref q) = qself {
-                                panic!("Check the qself: {:?}", q);
-                            }
-                            let mut t = quote::Tokens::new();
-                            path.to_tokens(&mut t);
-                            quote::Ident::from(format!(
-                                "<{} as InheritanceSlots>::INHERITANCE_SLOTS - 1 + {}",
-                                t.as_str(), idx))
-                        },
-                        _ => {
-                            debug!("Generating 0 inheritance slot for {:?}", inherit_type);
-                            quote::Ident::from("0 + ")
-                        }
-                    }
-                } else {
-                    quote::Ident::from(format!("{}", idx))
-                };
+                let (effective_idx, js_effective_idx) = gen_effective_idx(first_field,
+                                                                          &parent_name,
+                                                                          inherit,
+                                                                          idx);
                 let field_name = quote::Ident::from(field_name_str);
-                let mut tt = quote::Tokens::new();
-                ty.to_tokens(&mut tt);
-                let slot_counter = if inherit && idx == 0 {
-                    quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS + ", tt.as_str()))
-                } else {
-                    quote::Ident::from(format!("<{} as NumSlots>::NUM_SLOTS + ", tt.as_str()))
-                };
-                let getter = gen_getter(id, ty, &effective_idx, inherit, idx);
-                let (setter, setter_name) = gen_setter(id, ty, &effective_idx, inherit, idx);
+                let (slot_counter, js_slot_counter) = gen_slot_counter(ty, &parent_name, inherit, idx);
+                let (rust_getter, js_getter) = gen_getter(id, ty, &effective_idx, &js_effective_idx,
+                                                          inherit, idx, name_str);
+                let (rust_setter, js_setter, setter_name) = gen_setter(id, ty, &effective_idx, &js_effective_idx,
+                                                                       inherit, idx, name_str);
                 let get_callarg = gen_get_callargs(ty, &field_name, &upcast_name, inherit, idx);
                 let setter_invocation = if inherit && idx == 0 {
                     quote!{}
@@ -487,9 +674,12 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                         self.#setter_name(cx, #field_name);
                     }
                 };
-                getters.push(getter);
-                setters.push(setter);
+                rust_getters.push(rust_getter);
+                rust_setters.push(rust_setter);
+                js_getters.push(js_getter);
+                js_setters.push(js_setter);
                 slot_counters.push(slot_counter);
+                js_slot_counters.push(js_slot_counter);
                 get_callargs.push(get_callarg);
                 setter_invocations.push(setter_invocation);
             }
@@ -502,9 +692,9 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                 }
             };
             let cur_field_len = if inherit {
-                getters.len() as u32 - 1
+                rust_getters.len() as u32 - 1
             } else {
-                getters.len() as u32
+                rust_getters.len() as u32
             };
             let num_fields = quote! {
                 pub unsafe fn num_fields(&self) -> u32 {
@@ -512,9 +702,12 @@ fn get_magic_struct_code(variant: &syn::VariantData)
                 }
             };
             MagicStructCode {
-                getters: getters,
-                setters: setters,
+                rust_getters: rust_getters,
+                rust_setters: rust_setters,
+                js_getters: js_getters,
+                js_setters: js_setters,
                 slot_counters: slot_counters,
+                js_slot_counters: js_slot_counters,
                 set_fields: set_fields,
                 num_fields: num_fields,
                 upcast: upcast,

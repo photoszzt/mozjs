@@ -3,7 +3,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
+#[cfg(feature = "native_method")]
 use conversions::ToJSValConvertible;
+#[cfg(feature = "native_method")]
 use glue::CreateCallArgsFromVp;
 
 extern crate libc;
@@ -21,11 +23,17 @@ magic_dom! {
     }
 }
 
+// Exposing native rust method to js side
+#[cfg(feature = "native_method")]
 js_getter!(js_get_x, get_x, DOMPointReadOnly);
+#[cfg(feature = "native_method")]
 js_getter!(js_get_y, get_y, DOMPointReadOnly);
+#[cfg(feature = "native_method")]
 js_getter!(js_get_z, get_z, DOMPointReadOnly);
+#[cfg(feature = "native_method")]
 js_getter!(js_get_w, get_w, DOMPointReadOnly);
 
+#[cfg(feature = "native_method")]
 lazy_static! {
     pub static ref DOMPOINTREADONLY_PS_ARR: [JSPropertySpec; 5] = [
         JSPropertySpec::getter("x\0".as_ptr() as *const libc::c_char,
@@ -40,6 +48,25 @@ lazy_static! {
         JSPropertySpec::getter("w\0".as_ptr() as *const libc::c_char,
                                JSPROP_ENUMERATE | JSPROP_PERMANENT,
                                Some(js_get_w)),
+        JSPropertySpec::end_spec(),
+    ];
+}
+
+#[cfg(not(feature = "native_method"))]
+lazy_static! {
+    pub static ref DOMPOINTREADONLY_PS_ARR: [JSPropertySpec; 5] = [
+        JSPropertySpec::getter_selfhosted("x\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          "DOMPointReadOnly_get_x\0".as_ptr() as *const libc::c_char),
+        JSPropertySpec::getter_selfhosted("y\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          "DOMPointReadOnly_get_y\0".as_ptr() as *const libc::c_char),
+        JSPropertySpec::getter_selfhosted("z\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          "DOMPointReadOnly_get_z\0".as_ptr() as *const libc::c_char),
+        JSPropertySpec::getter_selfhosted("w\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          "DOMPointReadOnly_get_w\0".as_ptr() as *const libc::c_char),
         JSPropertySpec::end_spec(),
     ];
 }
