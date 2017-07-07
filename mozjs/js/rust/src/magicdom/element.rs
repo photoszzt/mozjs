@@ -7,6 +7,7 @@ use jsapi::root::*;
 use conversions::{ConversionResult, FromJSValConvertible};
 use conversions::ToJSValConvertible;
 use glue::CreateCallArgsFromVp;
+use jsslotconversions::ToFromJsSlots;
 
 extern crate libc;
 
@@ -16,18 +17,26 @@ magic_dom! {
     Element_constructor,
     magic_dom_spec_Element,
     struct Element_spec {
-        // TODO need to put Node here
-
         // TODO need to check the local_name, tag_name, namespace and prefix are valid html element
         // They should be Gekco Atom from the servo description
+        _inherit: node::Node,
         local_name: *mut JSString,
         tag_name: *mut JSString,
         namespace: *mut JSString,
         prefix: *mut JSString,
         id: *mut JSString,
-        attrs: Vec<attr::Attr>,
+        attrs: *mut JSObject,
         // TODO some of the fields are pointer to Element, those comes in later
     }
+}
+
+impl Element {
+    gen_getter_inherit!(get_node_type, u16, as_Node);
+    gen_getter_inherit!(get_node_name, *mut JSString, as_Node);
+    gen_getter_inherit!(get_base_uri, *mut JSString, as_Node);
+    gen_getter_inherit!(get_is_connected, bool, as_Node);
+    gen_getter_inherit!(get_node_value, *mut JSString, as_Node);
+    gen_getter_inherit!(get_text_content, *mut JSString, as_Node);
 }
 
 // Exposing native rust method to js side

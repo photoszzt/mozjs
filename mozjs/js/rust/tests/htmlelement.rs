@@ -22,6 +22,9 @@ use js::magicdom::element::Element_constructor;
 use js::magicdom::htmlelement::HTMLELEMENT_CLASS;
 use js::magicdom::htmlelement::HTMLELEMENT_PS_ARR;
 use js::magicdom::htmlelement::HtmlElement_constructor;
+use js::magicdom::node::NODE_CLASS;
+use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::Node_constructor;
 
 use std::ptr;
 use std::str;
@@ -42,8 +45,14 @@ fn get_and_set() {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
+        rooted!(in(cx) let node_proto =
+                JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
+                             5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             std::ptr::null(), std::ptr::null())
+        );
+
         rooted!(in(cx) let element_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(), &ELEMENT_CLASS, Some(Element_constructor),
+                JS_InitClass(cx, global.handle(), node_proto.handle(), &ELEMENT_CLASS, Some(Element_constructor),
                              5, ELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
@@ -68,13 +77,39 @@ fn get_and_set() {
         assert!(rt.evaluate_script(global.handle(), r#"
 let attr1 = new Attr("l", "a", "l", "p", "f");
 let attr2 = new Attr("l", "b", "l", "p", "b");
-let element = new HtmlElement("la", "a", "l", "pp", "foo", [attr1, attr2], "title",
+let element = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2], "title",
 "en", false, "dir", false, 1, "ackey", "ackeylabel", false, false);
 if (Object.getPrototypeOf(element) != HtmlElement.prototype) {
     throw Error("element prototype is wrong");
 }
 if (!(element instanceof HtmlElement)) {
     throw Error("is not instance of HtmlElement?");
+}
+if (element.node_type != 1) {
+    throw Error("element.node_type is not 1");
+}
+if (element.node_name != "Node") {
+    throw Error("element.node_name is not Node");
+}
+if (element.base_uri != "mozilla/en") {
+    throw Error("element.base_uri is not mozilla/en");
+}
+if (element.is_connected != false) {
+    throw error("element.is_connected is not false");
+}
+if (element.node_value != "n") {
+    throw error("element.node_value is not n");
+}
+if (element.text_content != "h1") {
+    throw error("element.text_content is not h1");
+}
+element.node_value = "h6";
+element.text_content = "<b>";
+if (element.node_value != "h6") {
+    throw error("element.node_value is not h6");
+}
+if (element.text_content != "<b>") {
+    throw error("element.text_content is not <b>");
 }
 if (element.local_name != "la") {
     throw Error("element.local_name is not la");
@@ -193,6 +228,6 @@ if (element.spellcheck != true) {
     throw Error("element.spellcheck is not true");
 }
 "#,
-                                   "test", 137, rval.handle_mut()).is_ok());
+                                   "test", 152, rval.handle_mut()).is_ok());
     }
 }

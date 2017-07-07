@@ -8,7 +8,6 @@ use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
                   ToJSValConvertible};
 #[cfg(feature = "native_method")]
 use glue::CreateCallArgsFromVp;
-use magicdom::*;
 use jsslotconversions::ToFromJsSlots;
 
 extern crate libc;
@@ -39,14 +38,14 @@ impl HtmlElement {
     gen_getter_inherit!(get_namespace, *mut JSString, as_Element);
     gen_getter_inherit!(get_prefix, *mut JSString, as_Element);
     gen_getter_inherit!(get_id, *mut JSString, as_Element);
-    gen_getter_inherit!(get_attrs, Vec<attr::Attr>, as_Element);
+    gen_getter_inherit!(get_attrs, *mut JSObject, as_Element);
 
     gen_setter_inherit!(set_local_name, *mut JSString, as_Element);
     gen_setter_inherit!(set_tag_name, *mut JSString, as_Element);
     gen_setter_inherit!(set_namespace, *mut JSString, as_Element);
     gen_setter_inherit!(set_prefix, *mut JSString, as_Element);
     gen_setter_inherit!(set_id, *mut JSString, as_Element);
-    gen_setter_inherit!(set_attrs, Vec<attr::Attr>, as_Element);
+    gen_setter_inherit!(set_attrs, *mut JSObject, as_Element);
 }
 
 // Exposing native rust method to js side

@@ -410,6 +410,7 @@ const WHITELIST_FUNCTIONS: &'static [&'static str] = &[
     "js::ToInt32Slow",
     "js::ToInt64Slow",
     "js::ToNumberSlow",
+    "js::ToObjectSlow",
     "js::ToStringSlow",
     "js::ToUint16Slow",
     "js::ToUint32Slow",

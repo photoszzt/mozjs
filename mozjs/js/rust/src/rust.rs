@@ -896,6 +896,16 @@ pub unsafe fn ToString(cx: *mut JSContext, v: JS::HandleValue) -> *mut JSString 
     js::ToStringSlow(cx, v)
 }
 
+#[inline]
+pub unsafe fn ToObject(cx: *mut JSContext, v: JS::HandleValue) -> *mut JSObject {
+    let val = *v.ptr;
+    if val.is_object() {
+        return val.to_object();
+    }
+
+    js::ToObjectSlow(cx, v, false)
+}
+
 pub unsafe extern fn report_warning(_cx: *mut JSContext, report: *mut JSErrorReport) {
     fn latin1_to_string(bytes: &[u8]) -> String {
         bytes.iter().map(|c| char::from_u32(*c as u32).unwrap()).collect()
