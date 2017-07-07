@@ -18,6 +18,7 @@ use js::magicdom::attr::ATTR_PS_ARR;
 use js::magicdom::attr::Attr_constructor;
 use js::magicdom::element::ELEMENT_CLASS;
 use js::magicdom::element::ELEMENT_PS_ARR;
+use js::magicdom::element::ELEMENT_FN_ARR;
 use js::magicdom::element::Element_constructor;
 use js::magicdom::node::NODE_CLASS;
 use js::magicdom::node::NODE_PS_ARR;
@@ -51,7 +52,7 @@ fn get_and_set() {
         rooted!(in(cx) let _element_proto =
                 JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ELEMENT_CLASS, Some(Element_constructor),
-                             5, ELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
+                             5, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -147,11 +148,29 @@ if (attrss[1].prefix != "pp") {
 if (attrss[1].value != "bar") {
     throw Error("attrss[1].value is not boo");
 }
+let value = element.getAttributes("pp:la");
+if (value != "foo") {
+    throw Error("value is not foo");
+}
+let value1 = element.getAttributes("pp:lb");
+if (value1 != "bar") {
+    throw Error("value is not bar");
+}
+element.setAttributes("pp:la", "baz");
+let value2 = element.getAttributes("pp:la");
+if (value2 != "baz") {
+    throw Error("value is not baz");
+}
+element.setAttributes("id", "idbaz");
+let value3 = element.getAttributes("id");
+if (value3 != "idbaz") {
+    throw Error("value is not baz");
+}
 element.id = "bar";
 if (element.id != "bar") {
     throw Error("element.id is not bar");
 }
 "#,
-                                   "test", 60, rval.handle_mut()).is_ok());
+                                   "test", 103, rval.handle_mut()).is_ok());
     }
 }

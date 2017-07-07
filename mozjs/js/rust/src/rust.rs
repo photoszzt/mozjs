@@ -1127,6 +1127,71 @@ pub unsafe fn maybe_wrap_value(cx: *mut JSContext, rval: JS::MutableHandleValue)
     }
 }
 
+impl JSFunctionSpec {
+    // corresponding function of the spidermonkey macro(JS_FN...)
+
+    pub fn js_fs(name: *const ::std::os::raw::c_char,
+                 func: JSNative,
+                 nargs: u16,
+                 flags: u16) -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: name,
+            call: JSNativeWrapper {
+                op: func,
+                info: ptr::null(),
+            },
+            nargs: nargs,
+            flags: flags,
+            selfHostedName: 0 as *const _,
+        }
+    }
+
+    pub fn js_fn(name: *const ::std::os::raw::c_char,
+                 func: JSNative,
+                 nargs: u16,
+                 flags: u16) -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: name,
+            call: JSNativeWrapper {
+                op: func,
+                info: ptr::null(),
+            },
+            nargs: nargs,
+            flags: flags | JSFUN_STUB_GSOPS as u16,
+            selfHostedName: 0 as *const _,
+        }
+    }
+
+    pub fn js_selfhosted_fn(name: *const ::std::os::raw::c_char,
+                            selfHostedName: *const ::std::os::raw::c_char,
+                            nargs: u16,
+                            flags: u16) -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: name,
+            call: JSNativeWrapper {
+                op: None,
+                info: ptr::null(),
+            },
+            nargs: nargs,
+            flags: flags,
+            selfHostedName: selfHostedName,
+        }
+    }
+
+    pub fn end_spec() -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: ptr::null(),
+            call: JSNativeWrapper {
+                op: None,
+                info: ptr::null(),
+            },
+            nargs: 0,
+            flags: 0,
+            selfHostedName: 0 as *const _,
+        }
+    }
+}
+
 impl JSPropertySpec {
     pub fn getter(name: *const ::std::os::raw::c_char, flags: u8, func: JSNative)
                         -> JSPropertySpec {

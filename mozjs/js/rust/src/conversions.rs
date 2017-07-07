@@ -624,12 +624,14 @@ impl<T: ToJSValConvertible> ToJSValConvertible for Vec<T> {
 /// Behaves like RootedGuard (roots on creation, unroots on drop),
 /// but borrows and allows access to the whole ForOfIterator, so
 /// that methods on ForOfIterator can still be used through it.
-struct ForOfIteratorGuard<'a> {
-    root: &'a mut JS::ForOfIterator
+pub struct ForOfIteratorGuard<'a> {
+    /// the field contains in the ForOfIteratorGuard
+    pub root: &'a mut JS::ForOfIterator
 }
 
 impl<'a> ForOfIteratorGuard<'a> {
-    fn new(cx: *mut JSContext, root: &'a mut JS::ForOfIterator) -> Self {
+    /// Creates a new ForOfIteratorGuard
+    pub fn new(cx: *mut JSContext, root: &'a mut JS::ForOfIterator) -> Self {
         unsafe {
             root.iterator.register_with_root_lists(cx);
         }
