@@ -35,7 +35,7 @@ use jsapi::root::*;
 use jsval::{BooleanValue, Int32Value, NullValue, UInt32Value, UndefinedValue};
 use jsval::{ObjectValue, ObjectOrNullValue, StringValue};
 use rust::{ToBoolean, ToInt32, ToInt64, ToNumber, ToUint16, ToUint32, ToUint64};
-use rust::{ToString, maybe_wrap_object_or_null_value};
+use rust::{ToString, ToObject, maybe_wrap_object_or_null_value};
 use rust::{maybe_wrap_object_value, maybe_wrap_value};
 use libc;
 use num_traits::{Bounded, Zero};
@@ -624,12 +624,14 @@ impl<T: ToJSValConvertible> ToJSValConvertible for Vec<T> {
 /// Behaves like RootedGuard (roots on creation, unroots on drop),
 /// but borrows and allows access to the whole ForOfIterator, so
 /// that methods on ForOfIterator can still be used through it.
-struct ForOfIteratorGuard<'a> {
-    root: &'a mut JS::ForOfIterator
+pub struct ForOfIteratorGuard<'a> {
+    /// the field contains in the ForOfIteratorGuard
+    pub root: &'a mut JS::ForOfIterator
 }
 
 impl<'a> ForOfIteratorGuard<'a> {
-    fn new(cx: *mut JSContext, root: &'a mut JS::ForOfIterator) -> Self {
+    /// Creates a new ForOfIteratorGuard
+    pub fn new(cx: *mut JSContext, root: &'a mut JS::ForOfIterator) -> Self {
         unsafe {
             root.iterator.register_with_root_lists(cx);
         }
@@ -699,6 +701,14 @@ impl ToJSValConvertible for *mut JSObject {
     unsafe fn to_jsval(&self, cx: *mut JSContext, rval: JS::MutableHandleValue) {
         rval.set(ObjectOrNullValue(*self));
         maybe_wrap_object_or_null_value(cx, rval);
+    }
+}
+
+impl FromJSValConvertible for *mut JSObject {
+    type Config = ();
+    unsafe fn from_jsval(cx: *mut JSContext, val: JS::HandleValue, _option: ())
+                         -> Result<ConversionResult<*mut JSObject>, ()> {
+        Ok(ToObject(cx, val)).map(ConversionResult::Success)
     }
 }
 

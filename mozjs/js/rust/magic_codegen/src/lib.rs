@@ -521,6 +521,8 @@ fn gen_slot_counter(ty: &syn::Ty,
             }
         } else if type_str.contains("String") {
             quote::Ident::from("1 + ")
+        } else if type_str.contains("JSObject") {
+            quote::Ident::from("1 + ")
         } else {
             quote::Ident::from(format!("{}_numslot() + ", type_str))
         };

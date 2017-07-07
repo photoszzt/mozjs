@@ -18,7 +18,11 @@ use js::magicdom::attr::ATTR_PS_ARR;
 use js::magicdom::attr::Attr_constructor;
 use js::magicdom::element::ELEMENT_CLASS;
 use js::magicdom::element::ELEMENT_PS_ARR;
+use js::magicdom::element::ELEMENT_FN_ARR;
 use js::magicdom::element::Element_constructor;
+use js::magicdom::node::NODE_CLASS;
+use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::Node_constructor;
 
 use std::ptr;
 use std::str;
@@ -39,10 +43,16 @@ fn get_and_set() {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
+        rooted!(in(cx) let node_proto =
+                JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
+                             5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             std::ptr::null(), std::ptr::null())
+        );
+
         rooted!(in(cx) let _element_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(),
+                JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ELEMENT_CLASS, Some(Element_constructor),
-                             5, ELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
+                             5, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -59,12 +69,38 @@ fn get_and_set() {
         assert!(rt.evaluate_script(global.handle(), r#"
 let attr1 = new Attr("la", "a", "l", "pp", "foo");
 let attr2 = new Attr("lb", "b", "l", "pp", "bar");
-let element = new Element("la", "a", "l", "pp", "foo", [attr1, attr2]);
+let element = new Element(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2]);
 if (Object.getPrototypeOf(element) != Element.prototype) {
     throw Error("element prototype is wrong");
 }
 if (!(element instanceof Element)) {
     throw Error("is not instance of Element?");
+}
+if (element.node_type != 1) {
+    throw Error("element.node_type is not 1");
+}
+if (element.node_name != "Node") {
+    throw Error("element.node_name is not Node");
+}
+if (element.base_uri != "mozilla/en") {
+    throw Error("element.base_uri is not mozilla/en");
+}
+if (element.is_connected != false) {
+    throw error("element.is_connected is not false");
+}
+if (element.node_value != "n") {
+    throw error("element.node_value is not n");
+}
+if (element.text_content != "h1") {
+    throw error("element.text_content is not h1");
+}
+element.node_value = "h6";
+element.text_content = "<b>";
+if (element.node_value != "h6") {
+    throw error("element.node_value is not h6");
+}
+if (element.text_content != "<b>") {
+    throw error("element.text_content is not <b>");
 }
 if (element.local_name != "la") {
     throw Error("element.local_name is not la");
@@ -112,11 +148,29 @@ if (attrss[1].prefix != "pp") {
 if (attrss[1].value != "bar") {
     throw Error("attrss[1].value is not boo");
 }
+let value = element.getAttributes("pp:la");
+if (value != "foo") {
+    throw Error("value is not foo");
+}
+let value1 = element.getAttributes("pp:lb");
+if (value1 != "bar") {
+    throw Error("value is not bar");
+}
+element.setAttributes("pp:la", "baz");
+let value2 = element.getAttributes("pp:la");
+if (value2 != "baz") {
+    throw Error("value is not baz");
+}
+element.setAttributes("id", "idbaz");
+let value3 = element.getAttributes("id");
+if (value3 != "idbaz") {
+    throw Error("value is not baz");
+}
 element.id = "bar";
 if (element.id != "bar") {
     throw Error("element.id is not bar");
 }
 "#,
-                                   "test", 60, rval.handle_mut()).is_ok());
+                                   "test", 103, rval.handle_mut()).is_ok());
     }
 }

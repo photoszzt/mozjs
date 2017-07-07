@@ -508,3 +508,36 @@ impl ToFromJsSlots for *mut JSString {
     fn trace(_trc: *mut JSTracer, _obj: *mut JSObject, _offset: u32) {
     }
 }
+
+impl ToFromJsSlots for *mut JSObject {
+    type Target = Self;
+    const NEEDS_FINALIZE: bool = false;
+    const NEEDS_TRACE: bool = false;
+
+    unsafe fn from_slots(object: *mut JSObject, cx: *mut JSContext, offset: u32)
+                         -> Self::Target {
+        rooted!(in(cx) let val = JS_GetReservedSlot(object, offset));
+        if val.is_object() {
+            val.to_object()
+        } else if val.is_null() {
+            ptr::null_mut()
+        } else {
+            panic!("<*mut JSString as ToFromJsSlots>::from_slots called on non-string/null slot");
+        }
+    }
+
+    unsafe fn into_slots(self, object: *mut JSObject, cx: *mut JSContext, offset: u32) {
+        let ptr = if self.is_null() {
+            jsval::NullValue()
+        } else {
+            jsval::ObjectValue(self)
+        };
+        set_slot_val!(prev_val0, ptr, 0, cx, object, offset);
+    }
+
+    fn finalize(_fop: *mut js::FreeOp, _obj: *mut JSObject, _offset: u32) {
+    }
+
+    fn trace(_trc: *mut JSTracer, _obj: *mut JSObject, _offset: u32) {
+    }
+}

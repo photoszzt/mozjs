@@ -896,6 +896,16 @@ pub unsafe fn ToString(cx: *mut JSContext, v: JS::HandleValue) -> *mut JSString 
     js::ToStringSlow(cx, v)
 }
 
+#[inline]
+pub unsafe fn ToObject(cx: *mut JSContext, v: JS::HandleValue) -> *mut JSObject {
+    let val = *v.ptr;
+    if val.is_object() {
+        return val.to_object();
+    }
+
+    js::ToObjectSlow(cx, v, false)
+}
+
 pub unsafe extern fn report_warning(_cx: *mut JSContext, report: *mut JSErrorReport) {
     fn latin1_to_string(bytes: &[u8]) -> String {
         bytes.iter().map(|c| char::from_u32(*c as u32).unwrap()).collect()
@@ -1114,6 +1124,71 @@ pub unsafe fn maybe_wrap_value(cx: *mut JSContext, rval: JS::MutableHandleValue)
         assert!(JS_WrapValue(cx, rval));
     } else if rval.is_object() {
         maybe_wrap_object_value(cx, rval);
+    }
+}
+
+impl JSFunctionSpec {
+    // corresponding function of the spidermonkey macro(JS_FN...)
+
+    pub fn js_fs(name: *const ::std::os::raw::c_char,
+                 func: JSNative,
+                 nargs: u16,
+                 flags: u16) -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: name,
+            call: JSNativeWrapper {
+                op: func,
+                info: ptr::null(),
+            },
+            nargs: nargs,
+            flags: flags,
+            selfHostedName: 0 as *const _,
+        }
+    }
+
+    pub fn js_fn(name: *const ::std::os::raw::c_char,
+                 func: JSNative,
+                 nargs: u16,
+                 flags: u16) -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: name,
+            call: JSNativeWrapper {
+                op: func,
+                info: ptr::null(),
+            },
+            nargs: nargs,
+            flags: flags | JSFUN_STUB_GSOPS as u16,
+            selfHostedName: 0 as *const _,
+        }
+    }
+
+    pub fn js_selfhosted_fn(name: *const ::std::os::raw::c_char,
+                            selfHostedName: *const ::std::os::raw::c_char,
+                            nargs: u16,
+                            flags: u16) -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: name,
+            call: JSNativeWrapper {
+                op: None,
+                info: ptr::null(),
+            },
+            nargs: nargs,
+            flags: flags,
+            selfHostedName: selfHostedName,
+        }
+    }
+
+    pub fn end_spec() -> JSFunctionSpec {
+        JSFunctionSpec {
+            name: ptr::null(),
+            call: JSNativeWrapper {
+                op: None,
+                info: ptr::null(),
+            },
+            nargs: 0,
+            flags: 0,
+            selfHostedName: 0 as *const _,
+        }
     }
 }
 
