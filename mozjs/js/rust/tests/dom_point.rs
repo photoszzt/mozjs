@@ -6,15 +6,15 @@
 extern crate js;
 extern crate libc;
 
+use js::debug::{val_to_str, puts};
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
 use js::rust;
-use js::jsapi;
 use js::jsapi::root::JS;
-use js::jsapi::root::{JS_ReportErrorASCII, JS_NewGlobalObject,
-                      JS_InitClass, JSContext, JS_EncodeStringToUTF8, JS_DefineFunction,};
+use js::jsapi::root::{JS_NewGlobalObject,
+                      JS_InitClass, JS_DefineFunction,};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
-use js::jsval::{StringValue, UndefinedValue};
+use js::jsval::{UndefinedValue};
 use js::magicdom::dompoint::DOMPOINT_CLASS;
 use js::magicdom::dompoint::DOMPOINT_PS_ARR;
 use js::magicdom::dompoint::DOMPoint_constructor;
@@ -22,9 +22,7 @@ use js::magicdom::dompointreadonly::DOMPOINTREADONLY_CLASS;
 use js::magicdom::dompointreadonly::DOMPOINTREADONLY_PS_ARR;
 use js::magicdom::dompointreadonly::DOMPointReadOnly_constructor;
 
-use std::ffi::CStr;
 use std::ptr;
-use std::str;
 
 #[test]
 fn get_and_set() {
@@ -105,40 +103,4 @@ if (dp.w != 5000) {
 "#,
                                    "test", 36, rval.handle_mut()).is_ok());
     }
-}
-
-// val_to_str: debug function
-// Can turn a JSValue to JSString
-pub unsafe extern "C" fn val_to_str(context: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-    let args = JS::CallArgs::from_vp(vp, argc);
-
-    if args._base.argc_ != 1 {
-        JS_ReportErrorASCII(context, b"val_to_str() requires exactly 1 argument\0".as_ptr() as *const libc::c_char);
-        return false;
-    }
-
-    let arg = args.get(0);
-    let jsstr = jsapi::JS_ValueToSource(context, arg);
-    args.rval().set(StringValue(&*jsstr));
-    return true;
-}
-
-// print a JSString to terminal
-pub unsafe extern "C" fn puts(context: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-    let args = JS::CallArgs::from_vp(vp, argc);
-
-    if args._base.argc_ != 1 {
-        JS_ReportErrorASCII(context, b"puts() requires exactly 1 argument\0".as_ptr() as *const libc::c_char);
-        return false;
-    }
-
-    let arg = args.get(0);
-    let js = js::rust::ToString(context, arg);
-    rooted!(in(context) let message_root = js);
-    let message = JS_EncodeStringToUTF8(context, message_root.handle());
-    let message = CStr::from_ptr(message);
-    println!("{}", str::from_utf8(message.to_bytes()).unwrap());
-
-    args.rval().set(UndefinedValue());
-    return true;
 }

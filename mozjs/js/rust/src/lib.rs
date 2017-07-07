@@ -44,6 +44,7 @@ pub mod typedarray;
 
 pub mod jsapi;
 use self::jsapi::root::*;
+pub mod debug;
 
 #[macro_use]
 pub mod jsslotconversions;
