@@ -48,13 +48,13 @@ fn get_and_set() {
 
         rooted!(in(cx) let node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             6, NODE_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
         rooted!(in(cx) let element_proto =
                 JS_InitClass(cx, global.handle(), node_proto.handle(), &ELEMENT_CLASS, Some(Element_constructor),
-                             5, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
+                             12, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -68,7 +68,7 @@ fn get_and_set() {
         rooted!(in(cx) let _html_element_proto =
                 JS_InitClass(cx, global.handle(), element_proto.handle(),
                              &HTMLELEMENT_CLASS, Some(HtmlElement_constructor),
-                             10, HTMLELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
+                             22, HTMLELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
