@@ -733,7 +733,12 @@ impl ToJSValConvertible for Heap<*mut JSObject> {
 impl ToJSValConvertible for *mut JSString {
     #[inline]
     unsafe fn to_jsval(&self, _cx: *mut JSContext, rval: JS::MutableHandleValue) {
-        rval.set(StringValue(&**self));
+        let val = if self.is_null() {
+            NullValue()
+        } else {
+            StringValue(&**self)
+        };
+        rval.set(val);
     }
 }
 
