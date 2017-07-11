@@ -36,7 +36,7 @@ fn get_and_set() {
 
         rooted!(in(cx) let _node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             6, NODE_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 

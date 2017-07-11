@@ -138,7 +138,7 @@ pub extern "C" fn js_getAttributes(cx: *mut JSContext, argc: u32, vp: *mut JS::V
             return false;
         }
 
-        let mut ret = ptr::null_mut();
+        let mut ret: *mut JSString = ptr::null_mut();
         let mut mat_res : i32 = 0;
         loop {
             let mut done = false;

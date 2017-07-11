@@ -8,7 +8,10 @@ extern crate libc;
 extern crate test;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
-use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass, JSScript};
+use js::rust;
+use js::debug::{val_to_str, puts};
+use js::jsapi::root::JS;
+use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass, JSScript, JS_DefineFunction,};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
 use js::jsapi::root::JS_ExecuteScript;
@@ -30,8 +33,9 @@ use test::Bencher;
 
 use std::ptr;
 
+#[cfg(feature = "native_method")]
 #[bench]
-fn bench_htmlelement_getid(b: &mut Bencher) {
+fn bench_htmlelement_setattributes_js(_b: &mut Bencher) {
     let rt = Runtime::new().unwrap();
     let cx = rt.cx();
 
@@ -72,28 +76,40 @@ fn bench_htmlelement_getid(b: &mut Bencher) {
                              std::ptr::null(), std::ptr::null())
         );
 
+        let print_function = JS_DefineFunction(cx, global.handle(), b"puts\0".as_ptr() as *const libc::c_char,
+                                               Some(puts), 1, 0);
+        assert!(!print_function.is_null());
+        let to_str_function = JS_DefineFunction(cx, global.handle(), b"val_to_str\0".as_ptr() as *const libc::c_char,
+                                                Some(val_to_str), 1, 0);
+        assert!(!to_str_function.is_null());
+
+        JS::SetWarningReporter(cx, Some(rust::report_warning));
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         rooted!(in(cx) let mut script = ptr::null_mut() as *mut JSScript);
-        rt.evaluate_script(global.handle(), r#"
-let attr1 = new Attr("la", "a", "l", "p", "f");
-let attr2 = new Attr("lb", "b", "l", "p", "b");
-let element1 = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2], "title123",
-"en", false, "dir12345", false, 1, "ackeylab", "ackeylab", false, false);
-let attr3 = new Attr("lc", "c", "l", "p", "f");
-let attr4 = new Attr("ld", "d", "l", "p", "b");
-let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h2", "lb", "b", "l", "pp", "foo", [attr3, attr4], "title456",
-"es", false, "dir", false, 1, "ackey", "ackey456", false, false);
-let num = 10240;
-var ret;
-"#, "test", 10, rval.handle_mut()).is_ok();
-        rt.compile_script(global.handle(), r#"
-for ( var i = 0; i < num; i++) {
-ret = element2.id;
+        let _ = rt.compile_script(global.handle(), r#"
+var duration;
+function bench(num) {
+    let attr1 = new Attr("la", "a", "l", "p", "f");
+    let attr2 = new Attr("lb", "b", "l", "p", "b");
+    let element1 = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2],
+    "title123", "en", false, "dir12345", false, 1, "ackeylab", "ackeylab", false, false);
+    let attr3 = new Attr("lc", "c", "l", "p", "f");
+    let attr4 = new Attr("ld", "d", "l", "p", "b");
+    let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h1", "lb", "b", "l", "pp", "bar", [attr3, attr4],
+    "title456", "es", false, "dir", false, 1, "ackey", "ackey456", false, false);
+    var t1 = Date.now();
+    for ( var i = 0; i < num; i++) {
+        element1.setAttributes("p:la", "baz");
+    }
+    duration = Date.now() - t1;
 }
-"#, "test", 4, script.handle_mut());
-        b.iter(|| {
-            JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
-        });
+bench(102400);
+puts("");
+puts("setattribute time is");
+puts(val_to_str(duration));
+"#,
+                                  "test", 20, script.handle_mut());
+        JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
     }
 }

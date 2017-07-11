@@ -20,10 +20,14 @@ use js::magicdom::attr::ATTR_PS_ARR;
 use js::magicdom::attr::Attr_constructor;
 use js::magicdom::element::ELEMENT_CLASS;
 use js::magicdom::element::ELEMENT_PS_ARR;
+use js::magicdom::element::ELEMENT_FN_ARR;
 use js::magicdom::element::Element_constructor;
 use js::magicdom::htmlelement::HTMLELEMENT_CLASS;
 use js::magicdom::htmlelement::HTMLELEMENT_PS_ARR;
 use js::magicdom::htmlelement::HtmlElement_constructor;
+use js::magicdom::node::NODE_CLASS;
+use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::Node_constructor;
 use test::Bencher;
 
 use std::ptr;
@@ -44,9 +48,15 @@ fn bench_htmlelement_setid(b: &mut Bencher) {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
+        rooted!(in(cx) let node_proto =
+                JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
+                             6, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             std::ptr::null(), std::ptr::null())
+        );
+
         rooted!(in(cx) let element_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(), &ELEMENT_CLASS, Some(Element_constructor),
-                             5, ELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
+                JS_InitClass(cx, global.handle(), node_proto.handle(), &ELEMENT_CLASS, Some(Element_constructor),
+                             12, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -60,7 +70,7 @@ fn bench_htmlelement_setid(b: &mut Bencher) {
         rooted!(in(cx) let _html_element_proto =
                 JS_InitClass(cx, global.handle(), element_proto.handle(),
                              &HTMLELEMENT_CLASS, Some(HtmlElement_constructor),
-                             10, HTMLELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
+                             22, HTMLELEMENT_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -69,21 +79,23 @@ fn bench_htmlelement_setid(b: &mut Bencher) {
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         rooted!(in(cx) let mut script = ptr::null_mut() as *mut JSScript);
-        let _ = rt.compile_script(global.handle(), r#"
-let attr1 = new Attr("l", "a", "l", "p", "f");
-let attr2 = new Attr("l", "b", "l", "p", "b");
-let element1 = new HtmlElement("la", "a", "l", "pp", "foo", [attr1, attr2], "title123", "en",
-false, "dir12345", false, 1, "ackeylab", "ackeylab", false, false);
-let attr3 = new Attr("l", "a", "l", "p", "f");
-let attr4 = new Attr("l", "b", "l", "p", "b");
-let element2 = new HtmlElement("lb", "b", "l", "pp", "foo", [attr3, attr4], "title456", "es",
-false, "dir", false, 1, "ackey", "ackey456", false, false);
+        rt.evaluate_script(global.handle(), r#"
+let attr1 = new Attr("la", "a", "l", "p", "f");
+let attr2 = new Attr("lb", "b", "l", "p", "b");
+let element1 = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2], "title123",
+"en", false, "dir12345", false, 1, "ackeylab", "ackeylab", false, false);
+let attr3 = new Attr("lc", "c", "l", "p", "f");
+let attr4 = new Attr("ld", "d", "l", "p", "b");
+let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h1", "lb", "b", "l", "pp", "foo", [attr3, attr4], "title456",
+"es", false, "dir", false, 1, "ackey", "ackey456", false, false);
 let num = 10240;
+"#, "test", 10, rval.handle_mut()).is_ok();
+        let _ = rt.compile_script(global.handle(), r#"
 for ( var i = 0; i < num; i++) {
 element1.id = "baz";
 }
 "#,
-                                   "test", 13, script.handle_mut());
+                                   "test", 4, script.handle_mut());
         b.iter(|| {
             JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
         });
