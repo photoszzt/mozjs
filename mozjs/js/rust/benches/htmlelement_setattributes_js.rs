@@ -63,9 +63,9 @@ fn bench_htmlelement_setattributes_js(_b: &mut Bencher) {
         );
 
         rooted!(in(cx) let _attr_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(),
+                JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ATTR_CLASS, Some(Attr_constructor),
-                             5, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
+                             11, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -90,14 +90,14 @@ fn bench_htmlelement_setattributes_js(_b: &mut Bencher) {
         let _ = rt.compile_script(global.handle(), r#"
 var duration;
 function bench(num) {
-    let attr1 = new Attr("la", "a", "l", "p", "f");
-    let attr2 = new Attr("lb", "b", "l", "p", "b");
-    let element1 = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2],
-    "title123", "en", false, "dir12345", false, 1, "ackeylab", "ackeylab", false, false);
-    let attr3 = new Attr("lc", "c", "l", "p", "f");
-    let attr4 = new Attr("ld", "d", "l", "p", "b");
-    let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h1", "lb", "b", "l", "pp", "bar", [attr3, attr4],
-    "title456", "es", false, "dir", false, 1, "ackey", "ackey456", false, false);
+    let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "p", "f");
+    let attr2 = new Attr(1, "Node2", "mozilla/en", false, "n", "h1", "lb", "b", "l", "p", "b");
+    let element1 = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp",
+    "foo", [attr1, attr2], "title123", "en", false, "dir12345", false, 1, "ackeylab", "ackeylab", false, false);
+    let attr3 = new Attr(1, "Node3", "mozilla/es", false, "n", "h1", "lc", "c", "l", "p", "f");
+    let attr4 = new Attr(1, "Node4", "mozilla/es", false, "n", "h1", "ld", "d", "l", "p", "b");
+    let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h1", "lb", "b", "l", "pp",
+    "bar", [attr3, attr4], "title456", "es", false, "dir", false, 1, "ackey", "ackey456", false, false);
     var t1 = Date.now();
     for ( var i = 0; i < num; i++) {
         element1.setAttributes("p:la", "baz");
@@ -109,7 +109,7 @@ puts("");
 puts("setattribute time is");
 puts(val_to_str(duration));
 "#,
-                                  "test", 20, script.handle_mut());
+                                  "test", 22, script.handle_mut());
         JS_ExecuteScript(cx, script.handle(), rval.handle_mut());
     }
 }

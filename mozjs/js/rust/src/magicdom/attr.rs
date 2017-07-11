@@ -5,6 +5,7 @@
 use jsapi::root::*;
 #[cfg(feature = "native_method")]
 use conversions::ToJSValConvertible;
+use jsslotconversions::ToFromJsSlots;
 #[cfg(feature = "native_method")]
 use glue::CreateCallArgsFromVp;
 
@@ -17,12 +18,22 @@ magic_dom! {
     Attr_constructor,
     magic_dom_spec_Attr,
     struct Attr_spec {
+        _inherit: node::Node,
         identifier_local_name: *mut JSString,
         identifier_name: *mut JSString,
         identifier_namespace: *mut JSString,
         identifier_prefix: *mut JSString,
         value: *mut JSString, // TODO should be a enum inside servo fake it with one of possible value
     }
+}
+
+impl Attr {
+    gen_getter_inherit!(get_node_type, u16, as_Node);
+    gen_getter_inherit!(get_node_name, *mut JSString, as_Node);
+    gen_getter_inherit!(get_base_uri, *mut JSString, as_Node);
+    gen_getter_inherit!(get_is_connected, bool, as_Node);
+    gen_getter_inherit!(get_node_value, *mut JSString, as_Node);
+    gen_getter_inherit!(get_text_content, *mut JSString, as_Node);
 }
 
 // Exposing native rust method to js side

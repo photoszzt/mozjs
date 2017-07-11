@@ -57,9 +57,9 @@ fn get_and_set() {
         );
 
         rooted!(in(cx) let _attr_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(),
+                JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ATTR_CLASS, Some(Attr_constructor),
-                             5, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
+                             11, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -67,8 +67,8 @@ fn get_and_set() {
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
-let attr1 = new Attr("la", "a", "l", "pp", "foo");
-let attr2 = new Attr("lb", "b", "l", "pp", "bar");
+let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo");
+let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "lb", "b", "l", "pp", "bar");
 let element = new Element(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2]);
 if (Object.getPrototypeOf(element) != Element.prototype) {
     throw Error("element prototype is wrong");
@@ -118,6 +118,32 @@ if (element.id != "foo") {
     throw Error("element.id is not foo");
 }
 let attrss = element.attrs;
+if (attrss[0].node_type != 1) {
+    throw Error("attrss[0].node_type is not 1");
+}
+if (attrss[0].node_name != "Node") {
+    throw Error("attrss[0].node_name is not Node");
+}
+if (attrss[0].base_uri != "mozilla/en") {
+    throw Error("attrss[0].base_uri is not mozilla/en");
+}
+if (attrss[0].is_connected != false) {
+    throw error("attrss[0].is_connected is not false");
+}
+if (attrss[0].node_value != "n") {
+    throw error("attrss[0].node_value is not n");
+}
+if (attrss[0].text_content != "h1") {
+    throw error("attrss[0].text_content is not h1");
+}
+attrss[0].node_value = "h6";
+attrss[0].text_content = "<b>";
+if (attrss[0].node_value != "h6") {
+    throw error("attrss[0].node_value is not h6");
+}
+if (attrss[0].text_content != "<b>") {
+    throw error("attrss[0].text_content is not <b>");
+}
 if (attrss[0].local_name != "la") {
     throw Error("attr.local_name is not la");
 }
@@ -132,6 +158,32 @@ if (attrss[0].prefix != "pp") {
 }
 if (attrss[0].value != "foo") {
     throw Error("attrss[0].value is not foo");
+}
+if (attrss[1].node_type != 1) {
+    throw Error("attrss[1].node_type is not 1");
+}
+if (attrss[1].node_name != "Node") {
+    throw Error("attrss[1].node_name is not Node");
+}
+if (attrss[1].base_uri != "mozilla/en") {
+    throw Error("attrss[1].base_uri is not mozilla/en");
+}
+if (attrss[1].is_connected != false) {
+    throw error("attrss[1].is_connected is not false");
+}
+if (attrss[1].node_value != "n") {
+    throw error("attrss[1].node_value is not n");
+}
+if (attrss[1].text_content != "h1") {
+    throw error("attrss[1].text_content is not h1");
+}
+attrss[1].node_value = "h6";
+attrss[1].text_content = "<b>";
+if (attrss[1].node_value != "h6") {
+    throw error("attrss[1].node_value is not h6");
+}
+if (attrss[1].text_content != "<b>") {
+    throw error("attrss[1].text_content is not <b>");
 }
 if (attrss[1].local_name != "lb") {
     throw Error("attr.local_name is not lb");
@@ -171,6 +223,6 @@ if (element.id != "bar") {
     throw Error("element.id is not bar");
 }
 "#,
-                                   "test", 103, rval.handle_mut()).is_ok());
+                                   "test", 156, rval.handle_mut()).is_ok());
     }
 }
