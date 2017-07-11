@@ -16,6 +16,9 @@ use js::jsval::UndefinedValue;
 use js::magicdom::attr::ATTR_CLASS;
 use js::magicdom::attr::ATTR_PS_ARR;
 use js::magicdom::attr::Attr_constructor;
+use js::magicdom::node::NODE_CLASS;
+use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::Node_constructor;
 
 use std::ptr;
 use std::str;
@@ -36,22 +39,54 @@ fn get_and_set() {
 
         rooted!(in(cx) let proto = ptr::null_mut());
 
+        rooted!(in(cx) let node_proto =
+                JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
+                             5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             std::ptr::null(), std::ptr::null())
+        );
+
         rooted!(in(cx) let _attr_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(),
+                JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ATTR_CLASS, Some(Attr_constructor),
-                             5, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
+                             11, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
         JS::SetWarningReporter(cx, Some(rust::report_warning));
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
-let attr = new Attr("la", "a", "l", "pp", "foo");
+let attr = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo");
 if (Object.getPrototypeOf(attr) != Attr.prototype) {
     throw Error("attr prototype is wrong");
 }
 if (!(attr instanceof Attr)) {
     throw Error("is not instance of Attr?");
+}
+if (attr.node_type != 1) {
+    throw Error("attr.node_type is not 1");
+}
+if (attr.node_name != "Node") {
+    throw Error("attr.node_name is not Node");
+}
+if (attr.base_uri != "mozilla/en") {
+    throw Error("attr.base_uri is not mozilla/en");
+}
+if (attr.is_connected != false) {
+    throw error("attr.is_connected is not false");
+}
+if (attr.node_value != "n") {
+    throw error("attr.node_value is not n");
+}
+if (attr.text_content != "h1") {
+    throw error("attr.text_content is not h1");
+}
+attr.node_value = "h6";
+attr.text_content = "<b>";
+if (attr.node_value != "h6") {
+    throw error("attr.node_value is not h6");
+}
+if (attr.text_content != "<b>") {
+    throw error("attr.text_content is not <b>");
 }
 if (attr.local_name != "la") {
     throw Error("attr.local_name is not la");

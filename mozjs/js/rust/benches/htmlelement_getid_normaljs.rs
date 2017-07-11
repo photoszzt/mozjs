@@ -62,9 +62,9 @@ fn bench_htmlelement_getid_normaljs(_b: &mut Bencher) {
         );
 
         rooted!(in(cx) let _attr_proto =
-                JS_InitClass(cx, global.handle(), proto.handle(),
+                JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ATTR_CLASS, Some(Attr_constructor),
-                             5, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
+                             11, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
