@@ -75,16 +75,10 @@ pub trait ToFromJsSlots : NumSlots {
     unsafe fn into_slots(self, object: *mut JSObject, cx: *mut JSContext, offset: u32);
 
     /// Only called for types where `NEEDS_FINALIZE` is `true`.
-    fn finalize(_fop: *mut js::FreeOp, _obj: *mut JSObject, _offset: u32) {
-        // Provide a default no-op `finalize` method to make the procedural
-        // macro's life easier and not have to figure out how to sort which fields
-        // need finalization or not.
-    }
+    fn finalize(_fop: *mut js::FreeOp, _obj: *mut JSObject, _offset: u32);
 
     /// Custom GC tracing for these slots. Only called when `NEEDS_TRACE` is `true`.
-    fn trace(_trc: *mut JSTracer, _obj: *mut JSObject, _offset: u32) {
-        // Once again, no-op by default to make `magic_codegen`'s job easier
-    }
+    fn trace(_trc: *mut JSTracer, _obj: *mut JSObject, _offset: u32);
 }
 
 macro_rules! gen_from_slots {
