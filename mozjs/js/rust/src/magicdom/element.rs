@@ -4,8 +4,8 @@
 
 use jsapi::root::*;
 #[cfg(feature = "native_method")]
-use conversions::{ConversionResult, FromJSValConvertible};
-use conversions::ToJSValConvertible;
+use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
+#[cfg(feature = "native_method")]
 use glue::CreateCallArgsFromVp;
 use jsslotconversions::ToFromJsSlots;
 #[cfg(feature = "native_method")]
@@ -62,6 +62,7 @@ js_getter!(js_get_namespace, get_namespace, Element);
 js_getter!(js_get_prefix, get_prefix, Element);
 #[cfg(feature = "native_method")]
 js_getter!(js_get_id, get_id, Element);
+#[cfg(feature = "native_method")]
 js_getter!(js_get_attrs, get_attrs, Element);
 
 #[cfg(feature = "native_method")]
@@ -322,9 +323,9 @@ lazy_static! {
                                                  "Element_get_id\0".as_ptr() as *const libc::c_char,
                                                  "Element_set_id\0".as_ptr() as *const libc::c_char,
         ),
-        JSPropertySpec::getter(b"attrs\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_attrs)
+        JSPropertySpec::getter_selfhosted(b"attrs\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          "Element_get_attrs\0".as_ptr() as *const libc::c_char,
         ),
         JSPropertySpec::end_spec(),
     ];
