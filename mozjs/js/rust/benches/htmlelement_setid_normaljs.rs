@@ -28,6 +28,7 @@ use js::magicdom::htmlelement::HTMLELEMENT_PS_ARR;
 use js::magicdom::htmlelement::HtmlElement_constructor;
 use js::magicdom::node::NODE_CLASS;
 use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::NODE_FN_ARR;
 use js::magicdom::node::Node_constructor;
 use test::Bencher;
 
@@ -51,7 +52,7 @@ fn bench_htmlelement_setid_normaljs(_b: &mut Bencher) {
 
         rooted!(in(cx) let node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             6, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             6, NODE_PS_ARR.as_ptr(), NODE_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 

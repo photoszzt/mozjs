@@ -34,6 +34,7 @@ impl Attr {
     gen_getter_inherit!(get_is_connected, bool, as_Node);
     gen_getter_inherit!(get_node_value, *mut JSString, as_Node);
     gen_getter_inherit!(get_text_content, *mut JSString, as_Node);
+    gen_getter_inherit!(get_child_nodes, *mut JSObject, as_Node);
 }
 
 // Exposing native rust method to js side

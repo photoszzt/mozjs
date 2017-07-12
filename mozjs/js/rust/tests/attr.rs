@@ -18,6 +18,7 @@ use js::magicdom::attr::ATTR_PS_ARR;
 use js::magicdom::attr::Attr_constructor;
 use js::magicdom::node::NODE_CLASS;
 use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::NODE_FN_ARR;
 use js::magicdom::node::Node_constructor;
 
 use std::ptr;
@@ -41,21 +42,21 @@ fn get_and_set() {
 
         rooted!(in(cx) let node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             5, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             7, NODE_PS_ARR.as_ptr(), NODE_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
         rooted!(in(cx) let _attr_proto =
                 JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ATTR_CLASS, Some(Attr_constructor),
-                             11, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
+                             12, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
         JS::SetWarningReporter(cx, Some(rust::report_warning));
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
-let attr = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo");
+let attr = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "la", "a", "l", "pp", "foo");
 if (Object.getPrototypeOf(attr) != Attr.prototype) {
     throw Error("attr prototype is wrong");
 }

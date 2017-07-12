@@ -25,6 +25,7 @@ use js::magicdom::htmlelement::HTMLELEMENT_PS_ARR;
 use js::magicdom::htmlelement::HtmlElement_constructor;
 use js::magicdom::node::NODE_CLASS;
 use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::NODE_FN_ARR;
 use js::magicdom::node::Node_constructor;
 
 use std::ptr;
@@ -48,20 +49,20 @@ fn get_and_set() {
 
         rooted!(in(cx) let node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             6, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             6, NODE_PS_ARR.as_ptr(), NODE_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
         rooted!(in(cx) let element_proto =
                 JS_InitClass(cx, global.handle(), node_proto.handle(), &ELEMENT_CLASS, Some(Element_constructor),
-                             12, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
+                             13, ELEMENT_PS_ARR.as_ptr(), ELEMENT_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
         rooted!(in(cx) let _attr_proto =
                 JS_InitClass(cx, global.handle(), node_proto.handle(),
                              &ATTR_CLASS, Some(Attr_constructor),
-                             11, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
+                             12, ATTR_PS_ARR.as_ptr(), std::ptr::null(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -76,10 +77,10 @@ fn get_and_set() {
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
-let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "l", "a", "l", "p", "f");
-let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "l", "b", "l", "p", "b");
-let element = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2], "title",
-"en", false, "dir", false, 1, "ackey", "ackeylabel", false, false);
+let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "l", "a", "l", "p", "f");
+let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "l", "b", "l", "p", "b");
+let element = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", [], "la", "a", "l", "pp",
+"foo", [attr1, attr2], "title", "en", false, "dir", false, 1, "ackey", "ackeylabel", false, false);
 if (Object.getPrototypeOf(element) != HtmlElement.prototype) {
     throw Error("element prototype is wrong");
 }
@@ -214,16 +215,6 @@ let value = element.getAttributes("p:l");
 if (value != "f") {
     throw Error("value is not foo");
 }
-element.setAttributes("p:l", "baz");
-let value2 = element.getAttributes("p:l");
-if (value2 != "baz") {
-    throw Error("value is not baz");
-}
-element.setAttributes("id", "idbaz");
-let value3 = element.getAttributes("id");
-if (value3 != "idbaz") {
-    throw Error("value is not idbaz");
-}
 element.id = "bar";
 if (element.id != "bar") {
     throw Error("element.id is not bar");
@@ -296,5 +287,20 @@ if (element.spellcheck != true) {
 }
 "#,
                                    "test", 218, rval.handle_mut()).is_ok());
+        if cfg!(feature = "native_method") {
+            assert!(rt.evaluate_script(global.handle(), r#"))
+element.setAttributes("p:l", "baz");
+let value2 = element.getAttributes("p:l");
+if (value2 != "baz") {
+    throw Error("value is not baz");
+}
+element.setAttributes("id", "idbaz");
+let value3 = element.getAttributes("id");
+if (value3 != "idbaz") {
+    throw Error("value is not idbaz");
+}
+"#,
+                                       "test", 11, rval.handle_mut()).is_ok());
+        }
     }
 }

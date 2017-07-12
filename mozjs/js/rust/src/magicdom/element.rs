@@ -49,6 +49,7 @@ impl Element {
     gen_getter_inherit!(get_is_connected, bool, as_Node);
     gen_getter_inherit!(get_node_value, *mut JSString, as_Node);
     gen_getter_inherit!(get_text_content, *mut JSString, as_Node);
+    gen_getter_inherit!(get_child_nodes, *mut JSObject, as_Node);
 }
 
 // Exposing native rust method to js side
@@ -248,7 +249,6 @@ pub extern "C" fn js_setAttributes(cx: *mut JSContext, argc: u32, vp: *mut JS::V
             rooted!(in(cx) let mut val1 = UndefinedValue());
             obj.to_jsval(cx, val1.handle_mut());
             JS_SetElement(cx, attrs.handle(), length, val1.handle());
-            JS_GetArrayLength(cx, attrs.handle(), &mut length);
         }
         true
     };
