@@ -3,10 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-#[cfg(feature = "native_method")]
-use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
-#[cfg(feature = "native_method")]
-use glue::CreateCallArgsFromVp;
 use jsslotconversions::ToFromJsSlots;
 
 extern crate libc;
@@ -35,41 +31,42 @@ impl DOMPoint {
 
 // Exposing native rust method to js side
 #[cfg(feature = "native_method")]
-js_getter!(js_get_x, get_x, DOMPoint);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_y, get_y, DOMPoint);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_z, get_z, DOMPoint);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_w, get_w, DOMPoint);
+mod native {
+    use jsapi::root::*;
+    use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
+    use glue::CreateCallArgsFromVp;
+    use super::*;
 
-#[cfg(feature = "native_method")]
-js_setter!(js_set_x, set_x, DOMPoint, ());
-#[cfg(feature = "native_method")]
-js_setter!(js_set_y, set_y, DOMPoint, ());
-#[cfg(feature = "native_method")]
-js_setter!(js_set_z, set_z, DOMPoint, ());
-#[cfg(feature = "native_method")]
-js_setter!(js_set_w, set_w, DOMPoint, ());
+    js_getter!(js_get_x, get_x, DOMPoint);
+    js_getter!(js_get_y, get_y, DOMPoint);
+    js_getter!(js_get_z, get_z, DOMPoint);
+    js_getter!(js_get_w, get_w, DOMPoint);
 
-#[cfg(feature = "native_method")]
-lazy_static! {
-    pub static ref DOMPOINT_PS_ARR: [JSPropertySpec; 5] = [
-        JSPropertySpec::getter_setter("x\0".as_ptr() as *const libc::c_char,
-                                      JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                      Some(js_get_x), Some(js_set_x)),
-        JSPropertySpec::getter_setter("y\0".as_ptr() as *const libc::c_char,
-                                      JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                      Some(js_get_y), Some(js_set_y)),
-        JSPropertySpec::getter_setter("z\0".as_ptr() as *const libc::c_char,
-                                      JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                      Some(js_get_z), Some(js_set_z)),
-        JSPropertySpec::getter_setter("w\0".as_ptr() as *const libc::c_char,
-                                      JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                                      Some(js_get_w), Some(js_set_w)),
-        JSPropertySpec::end_spec(),
-    ];
+    js_setter!(js_set_x, set_x, DOMPoint, ());
+    js_setter!(js_set_y, set_y, DOMPoint, ());
+    js_setter!(js_set_z, set_z, DOMPoint, ());
+    js_setter!(js_set_w, set_w, DOMPoint, ());
+
+    lazy_static! {
+        pub static ref DOMPOINT_PS_ARR: [JSPropertySpec; 5] = [
+            JSPropertySpec::getter_setter("x\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          Some(js_get_x), Some(js_set_x)),
+            JSPropertySpec::getter_setter("y\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          Some(js_get_y), Some(js_set_y)),
+            JSPropertySpec::getter_setter("z\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          Some(js_get_z), Some(js_set_z)),
+            JSPropertySpec::getter_setter("w\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          Some(js_get_w), Some(js_set_w)),
+            JSPropertySpec::end_spec(),
+        ];
+    }
 }
+#[cfg(feature = "native_method")]
+pub use self::native::*;
 
 // self hosted getter and setter
 #[cfg(not(feature = "native_method"))]

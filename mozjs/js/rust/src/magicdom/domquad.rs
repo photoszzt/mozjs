@@ -3,10 +3,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-#[cfg(feature = "native_method")]
-use conversions::ToJSValConvertible;
-#[cfg(feature = "native_method")]
-use glue::CreateCallArgsFromVp;
 
 extern crate libc;
 
@@ -25,32 +21,37 @@ magic_dom! {
 
 // Exposing native rust method to js side
 #[cfg(feature = "native_method")]
-js_getter!(js_get_p1, get_p1, DOMQuad);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_p2, get_p2, DOMQuad);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_p3, get_p3, DOMQuad);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_p4, get_p4, DOMQuad);
+mod native {
+    use jsapi::root::*;
+    use conversions::ToJSValConvertible;
+    use glue::CreateCallArgsFromVp;
+    use super::*;
 
-#[cfg(feature = "native_method")]
-lazy_static! {
-    pub static ref DOMQUAD_PS_ARR: [JSPropertySpec; 5] = [
-        JSPropertySpec::getter(b"p1\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_p1)),
-        JSPropertySpec::getter(b"p2\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_p2)),
-        JSPropertySpec::getter(b"p3\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_p3)),
-        JSPropertySpec::getter(b"p4\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_p4)),
-        JSPropertySpec::end_spec(),
-    ];
+    js_getter!(js_get_p1, get_p1, DOMQuad);
+    js_getter!(js_get_p2, get_p2, DOMQuad);
+    js_getter!(js_get_p3, get_p3, DOMQuad);
+    js_getter!(js_get_p4, get_p4, DOMQuad);
+
+    lazy_static! {
+        pub static ref DOMQUAD_PS_ARR: [JSPropertySpec; 5] = [
+            JSPropertySpec::getter(b"p1\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_p1)),
+            JSPropertySpec::getter(b"p2\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_p2)),
+            JSPropertySpec::getter(b"p3\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_p3)),
+            JSPropertySpec::getter(b"p4\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_p4)),
+            JSPropertySpec::end_spec(),
+        ];
+    }
 }
+#[cfg(feature = "native_method")]
+pub use self::native::*;
 
 // self hosted getter and setter
 #[cfg(not(feature = "native_method"))]

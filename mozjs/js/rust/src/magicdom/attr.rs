@@ -3,11 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use jsapi::root::*;
-#[cfg(feature = "native_method")]
-use conversions::ToJSValConvertible;
 use jsslotconversions::ToFromJsSlots;
-#[cfg(feature = "native_method")]
-use glue::CreateCallArgsFromVp;
 
 extern crate libc;
 
@@ -39,37 +35,41 @@ impl Attr {
 
 // Exposing native rust method to js side
 #[cfg(feature = "native_method")]
-js_getter!(js_get_identifier_local_name, get_identifier_local_name, Attr);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_identifier_name, get_identifier_name, Attr);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_identifier_namespace, get_identifier_namespace, Attr);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_identifier_prefix, get_identifier_prefix, Attr);
-#[cfg(feature = "native_method")]
-js_getter!(js_get_value, get_value, Attr);
+mod native_method {
+    use jsapi::root::*;
+    use glue::CreateCallArgsFromVp;
+    use conversions::ToJSValConvertible;
+    use super::*;
 
-#[cfg(feature = "native_method")]
-lazy_static! {
-    pub static ref ATTR_PS_ARR: [JSPropertySpec; 6] = [
-        JSPropertySpec::getter(b"local_name\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_identifier_local_name)),
-        JSPropertySpec::getter(b"name\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_identifier_name)),
-        JSPropertySpec::getter(b"namespace\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_identifier_namespace)),
-        JSPropertySpec::getter(b"prefix\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_identifier_prefix)),
-        JSPropertySpec::getter(b"value\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_value)),
-        JSPropertySpec::end_spec(),
-    ];
+    js_getter!(js_get_identifier_local_name, get_identifier_local_name, Attr);
+    js_getter!(js_get_identifier_name, get_identifier_name, Attr);
+    js_getter!(js_get_identifier_namespace, get_identifier_namespace, Attr);
+    js_getter!(js_get_identifier_prefix, get_identifier_prefix, Attr);
+    js_getter!(js_get_value, get_value, Attr);
+
+    lazy_static! {
+        pub static ref ATTR_PS_ARR: [JSPropertySpec; 6] = [
+            JSPropertySpec::getter(b"local_name\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_identifier_local_name)),
+            JSPropertySpec::getter(b"name\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_identifier_name)),
+            JSPropertySpec::getter(b"namespace\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_identifier_namespace)),
+            JSPropertySpec::getter(b"prefix\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_identifier_prefix)),
+            JSPropertySpec::getter(b"value\0".as_ptr() as *const libc::c_char,
+                                   JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                   Some(js_get_value)),
+            JSPropertySpec::end_spec(),
+        ];
+    }
 }
+#[cfg(feature = "native_method")]
+pub use self::native_method::*;
 
 // self hosted getter and setter
 #[cfg(not(feature = "native_method"))]
