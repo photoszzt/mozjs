@@ -22,6 +22,7 @@ use js::magicdom::element::ELEMENT_FN_ARR;
 use js::magicdom::element::Element_constructor;
 use js::magicdom::node::NODE_CLASS;
 use js::magicdom::node::NODE_PS_ARR;
+use js::magicdom::node::NODE_FN_ARR;
 use js::magicdom::node::Node_constructor;
 
 use std::ptr;
@@ -45,7 +46,7 @@ fn get_and_set() {
 
         rooted!(in(cx) let node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             6, NODE_PS_ARR.as_ptr(), std::ptr::null(),
+                             6, NODE_PS_ARR.as_ptr(), NODE_FN_ARR.as_ptr(),
                              std::ptr::null(), std::ptr::null())
         );
 
@@ -67,9 +68,9 @@ fn get_and_set() {
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
-let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo");
-let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", "lb", "b", "l", "pp", "bar");
-let element = new Element(1, "Node", "mozilla/en", false, "n", "h1", "la", "a", "l", "pp", "foo", [attr1, attr2]);
+let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "la", "a", "l", "pp", "foo");
+let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "lb", "b", "l", "pp", "bar");
+let element = new Element(1, "Node", "mozilla/en", false, "n", "h1", [], "la", "a", "l", "pp", "foo", [attr1, attr2]);
 if (Object.getPrototypeOf(element) != Element.prototype) {
     throw Error("element prototype is wrong");
 }
@@ -208,6 +209,15 @@ let value1 = element.getAttributes("pp:lb");
 if (value1 != "bar") {
     throw Error("value is not bar");
 }
+element.id = "bar";
+if (element.id != "bar") {
+    throw Error("element.id is not bar");
+}
+"#,
+                                   "test", 156, rval.handle_mut()).is_ok());
+
+        if cfg!(feature = "native_method") {
+            assert!(rt.evaluate_script(global.handle(), r#"
 element.setAttributes("pp:la", "baz");
 let value2 = element.getAttributes("pp:la");
 if (value2 != "baz") {
@@ -218,11 +228,10 @@ let value3 = element.getAttributes("id");
 if (value3 != "idbaz") {
     throw Error("value is not baz");
 }
-element.id = "bar";
-if (element.id != "bar") {
-    throw Error("element.id is not bar");
-}
 "#,
-                                   "test", 156, rval.handle_mut()).is_ok());
+                                       "test", 11, rval.handle_mut()).is_ok());
+
+        }
     }
 }
+

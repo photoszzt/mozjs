@@ -27,9 +27,9 @@ fn get_and_set() {
     unsafe {
         rooted!(in(cx) let global =
                 JS_NewGlobalObject(cx, &SIMPLE_GLOBAL_CLASS, std::ptr::null_mut(),
-                                   OnNewGlobalHookOption::FireOnNewGlobalHook,
-                                   &CompartmentOptions::default())
-        );
+                OnNewGlobalHookOption::FireOnNewGlobalHook,
+                &CompartmentOptions::default())
+               );
 
         let _ac = js::ac::AutoCompartment::with_obj(cx, global.get());
 
@@ -37,47 +37,17 @@ fn get_and_set() {
 
         rooted!(in(cx) let _node_proto =
                 JS_InitClass(cx, global.handle(), proto.handle(), &NODE_CLASS, Some(Node_constructor),
-                             7, NODE_PS_ARR.as_ptr(), NODE_FN_ARR.as_ptr(),
-                             std::ptr::null(), std::ptr::null())
-        );
+                7, NODE_PS_ARR.as_ptr(), NODE_FN_ARR.as_ptr(),
+                std::ptr::null(), std::ptr::null())
+               );
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
+let node = new Node(1, "Node", "mozilla/en", false, "n", "h1", []);
 let node1 = new Node(1, "Node2", "mozilla/en", false, "x", "div", []);
 let node2 = new Node(1, "Node3", "mozilla/en", false, "p", "div", []);
-let node = new Node(1, "Node", "mozilla/en", false, "n", "h1", [node1, node2]);
-if (Object.getPrototypeOf(node) != Node.prototype) {
-    throw Error("node prototype is wrong");
-}
-if (!(node instanceof Node)) {
-    throw Error("is not instance of Node?");
-}
-if (node.node_type != 1) {
-    throw Error("node.node_type is not 1");
-}
-if (node.node_name != "Node") {
-    throw Error("node.node_name is not Node");
-}
-if (node.base_uri != "mozilla/en") {
-    throw Error("node.base_uri is not mozilla/en");
-}
-if (node.is_connected != false) {
-    throw Error("node.is_connected is not false");
-}
-if (node.node_value != "n") {
-    throw Error("node.node_value is not n");
-}
-if (node.text_content != "h1") {
-    throw Error("node.text_content is not h1");
-}
-node.node_value = "h6";
-node.text_content = "<b>";
-if (node.node_value != "h6") {
-    throw Error("node.node_value is not h6");
-}
-if (node.text_content != "<b>") {
-    throw Error("node.text_content is not <b>");
-}
+node.appendChild(node1);
+node.appendChild(node2);
 let childs = node.child_nodes;
 if (childs[0].node_type != 1) {
     throw Error("childs[0].node_type is not 1");
@@ -120,6 +90,34 @@ if (childs[1].text_content != "div") {
 }
 if (childs[1].child_nodes.length != 0) {
     throw Error("childs[1].child_nodes is not empty array");
+}
+for (var i = 0; i < 4; i++) {
+    let node3 = new Node(1, "Node"+i, "mozilla/es", false, "q"+i, "<a>", []);
+    node1.appendChild(node3);
+}
+let newchilds = childs[0].child_nodes;
+for (var i = 0; i < 4; i++) {
+    if (newchilds[i].node_type != 1) {
+        throw Error("newchilds[i].node_type is not 1");
+    }
+    if (newchilds[i].node_name != ("Node"+i)) {
+        throw Error("newchilds[i].node_name is not Node" + i);
+    }
+    if (newchilds[i].base_uri != "mozilla/es") {
+        throw Error("newchilds[i].base_uri is not mozilla/es");
+    }
+    if (newchilds[i].is_connected != false) {
+        throw Error("newchilds[i].is_connected is not false");
+    }
+    if (newchilds[i].node_value != ("q" + i)) {
+        throw Error("newchilds[i].node_value is not a" + i);
+    }
+    if (newchilds[i].text_content != "<a>") {
+        throw Error("newchilds[i].text_content is not <a>");
+    }
+    if (newchilds[i].child_nodes.length != 0) {
+        throw Error("newchilds[i].child_nodes is not empty array");
+    }
 }
 "#,
                                    "test", 33, rval.handle_mut()).is_ok());

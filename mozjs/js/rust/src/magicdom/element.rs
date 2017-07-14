@@ -4,8 +4,8 @@
 
 use jsapi::root::*;
 #[cfg(feature = "native_method")]
-use conversions::{ConversionResult, FromJSValConvertible};
-use conversions::ToJSValConvertible;
+use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
+#[cfg(feature = "native_method")]
 use glue::CreateCallArgsFromVp;
 use jsslotconversions::ToFromJsSlots;
 #[cfg(feature = "native_method")]
@@ -49,6 +49,7 @@ impl Element {
     gen_getter_inherit!(get_is_connected, bool, as_Node);
     gen_getter_inherit!(get_node_value, *mut JSString, as_Node);
     gen_getter_inherit!(get_text_content, *mut JSString, as_Node);
+    gen_getter_inherit!(get_child_nodes, *mut JSObject, as_Node);
 }
 
 // Exposing native rust method to js side
@@ -62,6 +63,7 @@ js_getter!(js_get_namespace, get_namespace, Element);
 js_getter!(js_get_prefix, get_prefix, Element);
 #[cfg(feature = "native_method")]
 js_getter!(js_get_id, get_id, Element);
+#[cfg(feature = "native_method")]
 js_getter!(js_get_attrs, get_attrs, Element);
 
 #[cfg(feature = "native_method")]
@@ -247,7 +249,6 @@ pub extern "C" fn js_setAttributes(cx: *mut JSContext, argc: u32, vp: *mut JS::V
             rooted!(in(cx) let mut val1 = UndefinedValue());
             obj.to_jsval(cx, val1.handle_mut());
             JS_SetElement(cx, attrs.handle(), length, val1.handle());
-            JS_GetArrayLength(cx, attrs.handle(), &mut length);
         }
         true
     };
@@ -322,9 +323,9 @@ lazy_static! {
                                                  "Element_get_id\0".as_ptr() as *const libc::c_char,
                                                  "Element_set_id\0".as_ptr() as *const libc::c_char,
         ),
-        JSPropertySpec::getter(b"attrs\0".as_ptr() as *const libc::c_char,
-                               JSPROP_ENUMERATE | JSPROP_PERMANENT,
-                               Some(js_get_attrs)
+        JSPropertySpec::getter_selfhosted(b"attrs\0".as_ptr() as *const libc::c_char,
+                                          JSPROP_ENUMERATE | JSPROP_PERMANENT,
+                                          "Element_get_attrs\0".as_ptr() as *const libc::c_char,
         ),
         JSPropertySpec::end_spec(),
     ];
