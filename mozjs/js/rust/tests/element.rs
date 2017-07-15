@@ -118,6 +118,14 @@ if (element.prefix != "pp") {
 if (element.id != "foo") {
     throw Error("element.id is not foo");
 }
+"#,
+                                   "test", 50, rval.handle_mut()).is_ok());
+        // Can't call getter directly when it's implemented in native array
+        // There's no setter for attrs since attrs is readonly. Calling
+        // getter when array is implemented using Rust vec transfer the ownership
+        // to the caller and there's no way to set it back...
+        #[cfg(not(feature = "native_array"))]
+        assert!(rt.evaluate_script(global.handle(), r#"
 let attrss = element.attrs;
 if (attrss[0].node_type != 1) {
     throw Error("attrss[0].node_type is not 1");
@@ -201,6 +209,9 @@ if (attrss[1].prefix != "pp") {
 if (attrss[1].value != "bar") {
     throw Error("attrss[1].value is not boo");
 }
+"#,
+                                   "test", 85, rval.handle_mut()).is_ok());
+        assert!(rt.evaluate_script(global.handle(), r#"
 let value = element.getAttributes("pp:la");
 if (value != "foo") {
     throw Error("value is not foo");
@@ -216,7 +227,7 @@ if (element.id != "bar") {
 "#,
                                    "test", 156, rval.handle_mut()).is_ok());
 
-        if cfg!(feature = "native_method") {
+        if cfg!(feature = "native_method") || cfg!(feature = "native_array") {
             assert!(rt.evaluate_script(global.handle(), r#"
 element.setAttributes("pp:la", "baz");
 let value2 = element.getAttributes("pp:la");

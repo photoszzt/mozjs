@@ -4,6 +4,8 @@
 
 use jsapi::root::*;
 use jsslotconversions::ToFromJsSlots;
+#[cfg(feature = "native_array")]
+use magicdom::attr;
 
 extern crate libc;
 
@@ -33,6 +35,9 @@ impl HtmlElement {
     gen_getter_inherit!(get_namespace, *mut JSString, as_Element);
     gen_getter_inherit!(get_prefix, *mut JSString, as_Element);
     gen_getter_inherit!(get_id, *mut JSString, as_Element);
+    #[cfg(feature = "native_array")]
+    gen_getter_inherit!(get_attrs, Vec<attr::Attr>, as_Element);
+    #[cfg(not(feature = "native_array"))]
     gen_getter_inherit!(get_attrs, *mut JSObject, as_Element);
 
     gen_setter_inherit!(set_local_name, *mut JSString, as_Element);
@@ -40,10 +45,13 @@ impl HtmlElement {
     gen_setter_inherit!(set_namespace, *mut JSString, as_Element);
     gen_setter_inherit!(set_prefix, *mut JSString, as_Element);
     gen_setter_inherit!(set_id, *mut JSString, as_Element);
+    #[cfg(feature = "native_array")]
+    gen_setter_inherit!(set_attrs, Vec<attr::Attr>, as_Element);
+    #[cfg(not(feature = "native_array"))]
     gen_setter_inherit!(set_attrs, *mut JSObject, as_Element);
 }
 
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method",feature = "native_array"))]
 mod native {
     use jsapi::root::*;
     use conversions::{ConversionResult, ConversionBehavior, FromJSValConvertible,
@@ -111,11 +119,11 @@ mod native {
         ];
     }
 }
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method",feature = "native_array"))]
 pub use self::native::*;
 
 // self hosted getter and setter
-#[cfg(not(feature = "native_method"))]
+#[cfg(not(any(feature = "native_method",feature = "native_array")))]
 lazy_static! {
     pub static ref HTMLELEMENT_PS_ARR: [JSPropertySpec; 11] = [
         JSPropertySpec::getter_setter_selfhosted(b"title\0".as_ptr() as *const libc::c_char,

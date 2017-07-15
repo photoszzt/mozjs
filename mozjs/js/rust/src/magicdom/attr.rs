@@ -34,7 +34,7 @@ impl Attr {
 }
 
 // Exposing native rust method to js side
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method",feature = "native_array"))]
 mod native_method {
     use jsapi::root::*;
     use glue::CreateCallArgsFromVp;
@@ -68,11 +68,11 @@ mod native_method {
         ];
     }
 }
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method",feature = "native_array"))]
 pub use self::native_method::*;
 
 // self hosted getter and setter
-#[cfg(not(feature = "native_method"))]
+#[cfg(not(any(feature = "native_method",feature = "native_array")))]
 lazy_static! {
     pub static ref ATTR_PS_ARR: [JSPropertySpec; 6] = [
         JSPropertySpec::getter_selfhosted(b"local_name\0".as_ptr() as *const libc::c_char,

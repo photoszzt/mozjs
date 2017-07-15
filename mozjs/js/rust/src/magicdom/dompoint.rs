@@ -30,7 +30,7 @@ impl DOMPoint {
 }
 
 // Exposing native rust method to js side
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method",feature = "native_array"))]
 mod native {
     use jsapi::root::*;
     use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
@@ -65,11 +65,11 @@ mod native {
         ];
     }
 }
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method",feature = "native_array"))]
 pub use self::native::*;
 
 // self hosted getter and setter
-#[cfg(not(feature = "native_method"))]
+#[cfg(not(any(feature = "native_method",feature = "native_array")))]
 lazy_static! {
     pub static ref DOMPOINT_PS_ARR: [JSPropertySpec; 5] = [
         JSPropertySpec::getter_setter_selfhosted("x\0".as_ptr() as *const libc::c_char,
