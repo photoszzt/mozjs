@@ -6,6 +6,24 @@ use jsapi::root::*;
 
 extern crate libc;
 
+#[cfg(feature = "native_array")]
+magic_dom! {
+    Node,
+    NODE_CLASS,
+    Node_constructor,
+    magic_dom_spec_Node,
+    struct Node_struct {
+        node_type: u16,
+        node_name: *mut JSString, // DOMString
+        base_uri: *mut JSString, // USVString
+        is_connected: bool,
+        node_value: *mut JSString, // DOMString
+        text_content: *mut JSString,  // DOMString
+        child_nodes: Vec<Node>, // array of nodes
+    }
+}
+
+#[cfg(not(feature = "native_array"))]
 magic_dom! {
     Node,
     NODE_CLASS,
@@ -26,7 +44,6 @@ magic_dom! {
 mod native_method {
     use conversions::{ConversionResult, FromJSValConvertible, ToJSValConvertible};
     use glue::CreateCallArgsFromVp;
-    use jsval::ObjectValue;
     use super::*;
 
     js_getter!(js_get_node_type, get_node_type, Node);
@@ -40,34 +57,82 @@ mod native_method {
     js_setter!(js_set_node_value, set_node_value, Node, ());
     js_setter!(js_set_text_content, set_text_content, Node, ());
 
-    pub extern "C" fn js_appendChild(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-        let res = unsafe {
-            let call_args = CreateCallArgsFromVp(argc, vp);
-            if call_args._base.argc_ != 1 {
-                JS_ReportErrorASCII(cx,
-                                    b"appendChild requires 1 argument\0".as_ptr() as
-                                    *const libc::c_char);
-                return false;
-            }
-            let obj = match Node::check_this(cx, &call_args) {
-                Some(obj_) => obj_,
-                None => {
+    #[cfg(feature = "native_array")]
+    mod native_array {
+        use super::*;
+
+        pub extern "C" fn js_appendChild(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
+            let res = unsafe {
+                let call_args = CreateCallArgsFromVp(argc, vp);
+                if call_args._base.argc_ != 1 {
                     JS_ReportErrorASCII(cx,
-                                        b"Can't convert JSObject\0".as_ptr() as *const libc::c_char);
+                                        b"appendChild requires 1 argument\0".as_ptr() as
+                                        *const libc::c_char);
                     return false;
                 }
-            };
-            let arg1 = call_args.index(0);
+                let obj = match Node::check_this(cx, &call_args) {
+                    Some(obj_) => obj_,
+                    None => {
+                        JS_ReportErrorASCII(cx,
+                                            b"Can't convert JSObject\0".as_ptr() as *const libc::c_char);
+                        return false;
+                    }
+                };
+                get_js_arg!(arg1, cx, call_args, 0, ());
 
-            rooted!(in(cx) let nodes = obj.get_child_nodes(cx));
-            let mut length: u32 = 0;
-            JS_GetArrayLength(cx, nodes.handle(), &mut length);
-            JS_SetArrayLength(cx, nodes.handle(), length + 1);
-            JS_SetElement(cx, nodes.handle(), length, arg1);
-            true
-        };
-        res
+                let mut nodes = match obj.get_child_nodes(cx) {
+                    Some(v) => v,
+                    None => {
+                        JS_ReportErrorASCII(cx, b"Can't get child nodes back\0".as_ptr()
+                                            as *const libc::c_char);
+                        return false;
+                    }
+                };
+                nodes.push(arg1);
+                obj.set_child_nodes(cx, nodes);
+                true
+            };
+            res
+        }
     }
+    #[cfg(feature = "native_array")]
+    pub use self::native_array::*;
+
+    #[cfg(not(feature = "native_array"))]
+    mod js_array {
+        use super::*;
+
+        pub extern "C" fn js_appendChild(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
+            let res = unsafe {
+                let call_args = CreateCallArgsFromVp(argc, vp);
+                if call_args._base.argc_ != 1 {
+                    JS_ReportErrorASCII(cx,
+                                        b"appendChild requires 1 argument\0".as_ptr() as
+                                        *const libc::c_char);
+                    return false;
+                }
+                let obj = match Node::check_this(cx, &call_args) {
+                    Some(obj_) => obj_,
+                    None => {
+                        JS_ReportErrorASCII(cx,
+                                            b"Can't convert JSObject\0".as_ptr() as *const libc::c_char);
+                        return false;
+                    }
+                };
+                let arg1 = call_args.index(0);
+
+                rooted!(in(cx) let nodes = obj.get_child_nodes(cx));
+                let mut length: u32 = 0;
+                JS_GetArrayLength(cx, nodes.handle(), &mut length);
+                JS_SetArrayLength(cx, nodes.handle(), length + 1);
+                JS_SetElement(cx, nodes.handle(), length, arg1);
+                true
+            };
+            res
+        }
+    }
+    #[cfg(not(feature = "native_array"))]
+    pub use self::js_array::*;
 
     lazy_static! {
         pub static ref NODE_PS_ARR: [JSPropertySpec; 8] = [

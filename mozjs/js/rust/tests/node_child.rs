@@ -7,7 +7,7 @@ extern crate js;
 extern crate libc;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
-use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass};
+use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass,};
 use js::jsapi::root::JS::CompartmentOptions;
 use js::jsapi::root::JS::OnNewGlobalHookOption;
 use js::jsval::UndefinedValue;
@@ -42,12 +42,17 @@ fn get_and_set() {
                );
 
         rooted!(in(cx) let mut rval = UndefinedValue());
+
         assert!(rt.evaluate_script(global.handle(), r#"
 let node = new Node(1, "Node", "mozilla/en", false, "n", "h1", []);
 let node1 = new Node(1, "Node2", "mozilla/en", false, "x", "div", []);
 let node2 = new Node(1, "Node3", "mozilla/en", false, "p", "div", []);
 node.appendChild(node1);
 node.appendChild(node2);
+for (var i = 0; i < 4; i++) {
+    let node3 = new Node(1, "Node"+i, "mozilla/es", false, "q"+i, "<a>", []);
+    node1.appendChild(node3);
+}
 let childs = node.child_nodes;
 if (childs[0].node_type != 1) {
     throw Error("childs[0].node_type is not 1");
@@ -67,8 +72,9 @@ if (childs[0].node_value != "x") {
 if (childs[0].text_content != "div") {
     throw Error("childs[0].text_content is not h1");
 }
-if (childs[0].child_nodes.length != 0) {
-    throw Error("childs[0].child_nodes is not empty array");
+let newchilds = childs[0].child_nodes;
+if (newchilds.length != 4) {
+    throw Error("childs[0].child_nodes length is not 4");
 }
 if (childs[1].node_type != 1) {
     throw Error("childs[1].node_type is not 1");
@@ -91,11 +97,6 @@ if (childs[1].text_content != "div") {
 if (childs[1].child_nodes.length != 0) {
     throw Error("childs[1].child_nodes is not empty array");
 }
-for (var i = 0; i < 4; i++) {
-    let node3 = new Node(1, "Node"+i, "mozilla/es", false, "q"+i, "<a>", []);
-    node1.appendChild(node3);
-}
-let newchilds = childs[0].child_nodes;
 for (var i = 0; i < 4; i++) {
     if (newchilds[i].node_type != 1) {
         throw Error("newchilds[i].node_type is not 1");
