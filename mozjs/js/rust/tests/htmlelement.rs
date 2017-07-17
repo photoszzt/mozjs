@@ -77,8 +77,8 @@ fn get_and_set() {
 
         rooted!(in(cx) let mut rval = UndefinedValue());
         assert!(rt.evaluate_script(global.handle(), r#"
-let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "l", "a", "l", "p", "f");
-let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "l", "b", "l", "p", "b");
+let attr1 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "la", "a", "l", "p", "f");
+let attr2 = new Attr(1, "Node", "mozilla/en", false, "n", "h1", [], "lb", "b", "l", "p", "b");
 let element = new HtmlElement(1, "Node", "mozilla/en", false, "n", "h1", [], "la", "a", "l", "pp",
 "foo", [attr1, attr2], "title", "en", false, "dir", false, 1, "ackey", "ackeylabel", false, false);
 if (Object.getPrototypeOf(element) != HtmlElement.prototype) {
@@ -128,6 +128,14 @@ if (element.prefix != "pp") {
 if (element.id != "foo") {
     throw Error("element.id is not foo");
 }
+"#,
+                                   "test", 51, rval.handle_mut()).is_ok());
+        // Can't call getter directly when it's implemented in native array
+        // There's no setter for attrs since attrs is readonly. Calling
+        // getter when array is implemented using Rust vec transfer the ownership
+        // to the caller and there's no way to set it back...
+        #[cfg(not(feature = "native_array"))]
+        assert!(rt.evaluate_script(global.handle(), r#"
 let attrss = element.attrs;
 if (attrss[0].node_type != 1) {
     throw Error("attrss[0].node_type is not 1");
@@ -155,7 +163,7 @@ if (attrss[0].node_value != "h6") {
 if (attrss[0].text_content != "<b>") {
     throw error("attrss[0].text_content is not <b>");
 }
-if (attrss[0].local_name != "l") {
+if (attrss[0].local_name != "la") {
     throw Error("attr.local_name is not la");
 }
 if (attrss[0].name != "a") {
@@ -196,7 +204,7 @@ if (attrss[1].node_value != "h6") {
 if (attrss[1].text_content != "<b>") {
     throw error("attrss[1].text_content is not <b>");
 }
-if (attrss[1].local_name != "l") {
+if (attrss[1].local_name != "lb") {
     throw Error("attr.local_name is not lb");
 }
 if (attrss[1].name != "b") {
@@ -211,10 +219,9 @@ if (attrss[1].prefix != "p") {
 if (attrss[1].value != "b") {
     throw Error("attrss[1].value is not boo");
 }
-let value = element.getAttributes("p:l");
-if (value != "f") {
-    throw Error("value is not foo");
-}
+"#,
+                                   "test", 85, rval.handle_mut()).is_ok());
+        assert!(rt.evaluate_script(global.handle(), r#"
 element.id = "bar";
 if (element.id != "bar") {
     throw Error("element.id is not bar");
@@ -286,11 +293,19 @@ if (element.spellcheck != true) {
     throw Error("element.spellcheck is not true");
 }
 "#,
-                                   "test", 218, rval.handle_mut()).is_ok());
-        if cfg!(feature = "native_method") {
-            assert!(rt.evaluate_script(global.handle(), r#"))
-element.setAttributes("p:l", "baz");
-let value2 = element.getAttributes("p:l");
+                                   "test", 71, rval.handle_mut()).is_ok());
+        // testing get/set attributes
+        assert!(rt.evaluate_script(global.handle(), r#"
+let value = element.getAttributes("p:la");
+if (value != "f") {
+    throw Error("value is not foo");
+}
+"#,
+                                   "test", 5, rval.handle_mut()).is_ok());
+        if cfg!(feature = "native_method") || cfg!(feature = "native_array") {
+            assert!(rt.evaluate_script(global.handle(), r#"
+element.setAttributes("p:la", "baz");
+let value2 = element.getAttributes("p:la");
 if (value2 != "baz") {
     throw Error("value is not baz");
 }
