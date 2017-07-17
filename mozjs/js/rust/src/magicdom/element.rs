@@ -4,6 +4,7 @@
 
 use jsapi::root::*;
 use jsslotconversions::ToFromJsSlots;
+use magicdom::node::Node;
 
 extern crate libc;
 
@@ -54,6 +55,9 @@ impl Element {
     gen_getter_inherit!(get_is_connected, bool, as_Node);
     gen_getter_inherit!(get_node_value, *mut JSString, as_Node);
     gen_getter_inherit!(get_text_content, *mut JSString, as_Node);
+    #[cfg(feature = "native_array")]
+    gen_getter_inherit!(get_child_nodes, Vec<Node>, as_Node);
+    #[cfg(not(feature = "native_array"))]
     gen_getter_inherit!(get_child_nodes, *mut JSObject, as_Node);
 }
 
