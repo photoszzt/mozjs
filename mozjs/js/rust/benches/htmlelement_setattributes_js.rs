@@ -34,7 +34,7 @@ use test::Bencher;
 
 use std::ptr;
 
-#[cfg(feature = "native_method")]
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 #[bench]
 fn bench_htmlelement_setattributes_js(_b: &mut Bencher) {
     let rt = Runtime::new().unwrap();

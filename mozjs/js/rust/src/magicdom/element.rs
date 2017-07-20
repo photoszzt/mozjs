@@ -150,7 +150,6 @@ mod native {
         }
 
         pub extern "C" fn js_setAttributes(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
-            println!("set attribute");
             let res = unsafe {
                 let call_args = CreateCallArgsFromVp(argc, vp);
                 if call_args._base.argc_ != 2 {
