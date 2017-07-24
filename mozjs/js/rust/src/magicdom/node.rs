@@ -59,6 +59,7 @@ mod native_method {
 
     #[cfg(feature = "native_array")]
     mod native_array {
+        use std::ptr;
         use super::*;
 
         pub extern "C" fn js_appendChild(cx: *mut JSContext, argc: u32, vp: *mut JS::Value) -> bool {
@@ -78,7 +79,7 @@ mod native_method {
                         return false;
                     }
                 };
-                get_js_arg!(arg1, cx, call_args, 0, ());
+                get_js_arg_inheritance!(arg1, cx, call_args, 0, &NODE_CLASS, Node);
 
                 let mut nodes = match obj.get_child_nodes(cx) {
                     Some(v) => v,
