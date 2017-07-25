@@ -80,6 +80,16 @@ macro_rules! get_js_arg {
 }
 
 #[macro_export]
+macro_rules! get_js_arg_inheritance {
+    ($val:ident, $cx:ident, $call_args:ident, $arg_idx:expr, $jsclass:expr, $domtype:ident) => {
+        // TODO add checking when I figure out how to add checking of inheritance
+        let handle = $call_args.index($arg_idx);
+        let obj = handle.get().to_object();
+        let $val = $domtype::new(obj);
+    }
+}
+
+#[macro_export]
 macro_rules! js_getter {
     ($js_getter_name:ident, $getter_name:ident, $name:ident) => {
         pub extern "C" fn $js_getter_name (cx: *mut JSContext, argc: u32, vp: *mut JS::Value)
