@@ -35,7 +35,7 @@ use test::Bencher;
 use std::ptr;
 
 #[bench]
-fn bench_htmlelement_setattributes_js(_b: &mut Bencher) {
+fn bench_htmlelement_expando_value_js(_b: &mut Bencher) {
     let rt = Runtime::new().unwrap();
     let cx = rt.cx();
 

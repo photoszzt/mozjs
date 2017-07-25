@@ -141,8 +141,9 @@ fn match_struct(name_str: &str, variant: &syn::VariantData) -> (quote::Tokens, q
     let num_reserved_slots = quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS",
                                                         name));
     let constructor_quote = gen_constructor(&name, &js_class);
-    let js_inherit_slot_name = quote::Ident::from(format!("{}_inherit_slot", name_str));
-    let js_numslot_name = quote::Ident::from(format!("{}_numslot", name_str));
+    let js_inherit_slot_name = quote::Ident::from(format!("{}_INHERIT_SLOT", name_str));
+    let js_numslot_name = quote::Ident::from(format!("{}_NUMSLOT", name_str));
+    let js_define_symbol = quote::Ident::from(format!("#define"));
 
     let rust_gen = quote! {
         extern crate libc;
@@ -312,13 +313,9 @@ fn match_struct(name_str: &str, variant: &syn::VariantData) -> (quote::Tokens, q
         }
     };
     let js_gen = quote!{
-        function #js_inherit_slot_name() {
-            return #(#js_slot_counters)* 0;
-        }
+        #js_define_symbol #js_inherit_slot_name #(#js_slot_counters)* 0
 
-        function #js_numslot_name() {
-            return 1;
-        }
+        #js_define_symbol #js_numslot_name 1
 
         #(#js_getters)*
 
@@ -492,7 +489,7 @@ fn gen_slot_counter(ty: &syn::Ty,
     let type_str = tt.as_str();
     if inherit && idx == 0 {
         (quote::Ident::from(format!("<{} as InheritanceSlots>::INHERITANCE_SLOTS + ", type_str)),
-         quote::Ident::from(format!("{}_inherit_slot() + ", parent_name)))
+         quote::Ident::from(format!("{}_INHERIT_SLOT + ", parent_name)))
     } else {
         let (type_first_part, type_last_part) = match *ty {
             syn::Ty::Path(ref qself, ref path) => {
@@ -512,19 +509,19 @@ fn gen_slot_counter(ty: &syn::Ty,
             }
         };
         let js_numslot = if type_first_part.starts_with("Vec") {
-            quote::Ident::from("Vec_numslot() + ")
+            quote::Ident::from("VEC_NUMSLOT + ")
         } else if type_last_part != "" {
             match type_last_part.as_str() {
                 "bool" | "str" | "String" | "u8" | "i8" | "u16" | "i16" | "u32" | "i32" | "u64" |
                 "i64" | "f32" | "f64" => quote::Ident::from("1 + "),
-                _ => quote::Ident::from(format!("{}_numslot() + ", type_last_part)),
+                _ => quote::Ident::from(format!("{}_NUMSLOT + ", type_last_part)),
             }
         } else if type_str.contains("String") {
             quote::Ident::from("1 + ")
         } else if type_str.contains("JSObject") {
             quote::Ident::from("1 + ")
         } else {
-            quote::Ident::from(format!("{}_numslot() + ", type_str))
+            quote::Ident::from(format!("{}_NUMSLOT + ", type_str))
         };
         (quote::Ident::from(format!("<{} as NumSlots>::NUM_SLOTS + ", type_str)),
          js_numslot)
@@ -543,7 +540,7 @@ fn gen_effective_idx(first_field: &syn::Field,
             "<{} as InheritanceSlots>::INHERITANCE_SLOTS - 1 + {}",
             t.as_str(), idx)),
          quote::Ident::from(format!(
-             "{}_inherit_slot() - 1 + {}",
+             "{}_INHERIT_SLOT - 1 + {}",
              parent_name, idx))
         )
     } else {
