@@ -2,36 +2,62 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 #![feature(test)]
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 #[macro_use]
 extern crate js;
 extern crate libc;
 extern crate test;
 
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::rust;
-use js::debug::{val_to_str, puts};
+#[cfg(any(feature = "native_method", feature = "native_array"))]
+use js::debug::{val_to_str, puts, gettime};
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::jsapi::root::JS;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass, JSScript, JS_DefineFunction,};
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::jsapi::root::JS::CompartmentOptions;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::jsapi::root::JS::OnNewGlobalHookOption;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::jsapi::root::JS_ExecuteScript;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::jsval::UndefinedValue;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::attr::ATTR_CLASS;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::attr::ATTR_PS_ARR;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::attr::Attr_constructor;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::element::ELEMENT_CLASS;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::element::ELEMENT_PS_ARR;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::element::ELEMENT_FN_ARR;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::element::Element_constructor;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::htmlelement::HTMLELEMENT_CLASS;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::htmlelement::HTMLELEMENT_PS_ARR;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::htmlelement::HtmlElement_constructor;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::node::NODE_CLASS;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::node::NODE_PS_ARR;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::node::NODE_FN_ARR;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use js::magicdom::node::Node_constructor;
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use test::Bencher;
 
+#[cfg(any(feature = "native_method", feature = "native_array"))]
 use std::ptr;
 
 #[cfg(any(feature = "native_method", feature = "native_array"))]
@@ -83,6 +109,9 @@ fn bench_htmlelement_setattributes_js(_b: &mut Bencher) {
         let to_str_function = JS_DefineFunction(cx, global.handle(), b"val_to_str\0".as_ptr() as *const libc::c_char,
                                                 Some(val_to_str), 1, 0);
         assert!(!to_str_function.is_null());
+        let get_time_function = JS_DefineFunction(cx, global.handle(), b"gettime\0".as_ptr() as *const libc::c_char,
+                                                  Some(gettime), 1, 0);
+        assert!(!get_time_function.is_null());
 
         JS::SetWarningReporter(cx, Some(rust::report_warning));
 
@@ -99,11 +128,12 @@ function bench(num) {
     let attr4 = new Attr(1, "Node4", "mozilla/es", false, "n", "h1", [], "ld", "d", "l", "p", "b");
     let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h1", [], "lb", "b", "l", "pp",
     "bar", [attr3, attr4], "title456", "es", false, "dir", false, 1, "ackey", "ackey456", false, false);
-    var t1 = Date.now();
+    var t1 = gettime();
     for ( var i = 0; i < num; i++) {
         element1.setAttributes("p:la", "baz");
     }
-    duration = Date.now() - t1;
+    duration = gettime() - t1;
+    duration = duration / 1000000.0;
 }
 bench(102400);
 puts("");

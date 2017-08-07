@@ -9,7 +9,7 @@ extern crate test;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
 use js::rust;
-use js::debug::{val_to_str, puts};
+use js::debug::{val_to_str, puts, gettime};
 use js::jsapi::root::JS;
 use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass, JSScript, JS_DefineFunction,};
 use js::jsapi::root::JS::CompartmentOptions;
@@ -82,6 +82,9 @@ fn bench_htmlelement_setid_js(_b: &mut Bencher) {
         let to_str_function = JS_DefineFunction(cx, global.handle(), b"val_to_str\0".as_ptr() as *const libc::c_char,
                                                 Some(val_to_str), 1, 0);
         assert!(!to_str_function.is_null());
+        let get_time_function = JS_DefineFunction(cx, global.handle(), b"gettime\0".as_ptr() as *const libc::c_char,
+                                                  Some(gettime), 1, 0);
+        assert!(!get_time_function.is_null());
 
         JS::SetWarningReporter(cx, Some(rust::report_warning));
 
@@ -98,11 +101,12 @@ function bench(num) {
     let attr4 = new Attr(1, "Node4", "mozilla/es", false, "n", "h1", [], "ld", "d", "l", "p", "b");
     let element2 = new HtmlElement(1, "Node2", "mozilla/es", false, "n", "h1", [], "lb", "b", "l", "pp",
     "bar", [attr3, attr4], "title456", "es", false, "dir", false, 1, "ackey", "ackey456", false, false);
-    var t1 = Date.now();
+    var t1 = gettime();
     for ( var i = 0; i < num; i++) {
         element1.id = "baz";
     }
-    duration = Date.now() - t1;
+    duration = gettime() - t1;
+    duration = duration / 1000000.0;
 }
 bench(102400);
 puts("");

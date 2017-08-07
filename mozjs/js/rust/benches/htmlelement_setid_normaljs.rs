@@ -9,7 +9,7 @@ extern crate test;
 
 use js::rust::{Runtime, SIMPLE_GLOBAL_CLASS};
 use js::rust;
-use js::debug::{val_to_str, puts};
+use js::debug::{val_to_str, puts, gettime};
 use js::jsapi::root::JS;
 use js::jsapi::root::{JS_NewGlobalObject, JS_InitClass, JSScript, JS_DefineFunction,};
 use js::jsapi::root::JS::CompartmentOptions;
@@ -82,6 +82,9 @@ fn bench_htmlelement_setid_normaljs(_b: &mut Bencher) {
         let to_str_function = JS_DefineFunction(cx, global.handle(), b"val_to_str\0".as_ptr() as *const libc::c_char,
                                                 Some(val_to_str), 1, 0);
         assert!(!to_str_function.is_null());
+        let get_time_function = JS_DefineFunction(cx, global.handle(), b"gettime\0".as_ptr() as *const libc::c_char,
+                                                  Some(gettime), 1, 0);
+        assert!(!get_time_function.is_null());
 
         JS::SetWarningReporter(cx, Some(rust::report_warning));
 
@@ -91,11 +94,12 @@ fn bench_htmlelement_setid_normaljs(_b: &mut Bencher) {
 var duration;
 function bench(num) {
     var a = {id: "jaz"};
-    var t1 = Date.now();
+    var t1 = gettime();
     for ( var i = 0; i < num; i++) {
         a.id = "caz";
     }
-    duration = Date.now() - t1;
+    duration = gettime() - t1;
+    duration = duration / 1000000.0;
 }
 bench(102400);
 puts("");

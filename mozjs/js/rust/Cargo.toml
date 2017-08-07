@@ -64,3 +64,4 @@ log = "0.3"
 heapsize = ">=0.2, <0.4"
 num-traits = "0.1.32"
 magic_codegen = { path = "magic_codegen" }
+time = "0.1"
